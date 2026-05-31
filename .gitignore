@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 profile/cv.md
+profile/cv_en.md
 profile/cv.pdf
 profile/CV_*.pdf
 *.pdf

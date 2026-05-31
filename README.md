@@ -27,22 +27,24 @@ ofertas --------->| Scraper  |--->| Matcher  |--->| Cover   |--->| Apply ATS |--
 ApplyJob/
 ├── main.py              # orquestador del pipeline
 ├── profile/
-│   ├── cv.md            # perfil del candidato (stack, experiencia, skills)
+│   ├── cv.md            # perfil del candidato en español (stack, experiencia, skills)
+│   ├── cv_en.md         # perfil del candidato en ingles (ofertas en ingles)
 │   ├── CV_Mickaell_Moran.pdf  # CV en PDF para adjuntar
 │   └── cv_template.md   # template de perfil
 ├── src/
 │   ├── scraper.py       # extrae informacion de ofertas desde URLs
 │   ├── profile.py       # carga y parsea el CV/perfil
 │   ├── matcher.py       # calcula compatibilidad oferta vs perfil
-│   ├── cover.py         # genera carta de presentacion via DeepSeek Flash
+│   ├── cover.py         # genera carta via DeepSeek Flash (es/en via param lang)
 │   ├── apply_ats.py     # auto-postulacion en ATS via Playwright
 │   ├── inbox.py         # lector IMAP para boletines
 │   └── sender.py        # envia correo via Gmail SMTP
 ├── samples/             # boletines de ofertas guardados
 ├── output/
-│   └── cartas/          # cartas generadas
+│   └── cartas/          # cartas generadas (gitignored: contienen PII)
 ├── run_batch.py         # batch: scrapea y genera cartas
 ├── run_manual.py        # batch: usa descripciones manuales
+├── run_today.py         # genera cartas para la shortlist de la fecha actual
 ├── test_apply.py        # test del modulo apply_ats
 └── .env                 # variables de entorno (no versionado)
 ```
@@ -106,7 +108,12 @@ python run_batch.py
 
 # Usa descripciones manuales (cuando el scraping falla)
 python run_manual.py
+
+# Genera cartas para la shortlist de ofertas de la fecha actual
+python run_today.py
 ```
+
+Las cartas en ingles se generan con `cover.generate(job, cv, lang="en")` (ej. Canonical).
 
 ### Auto-postulacion en ATS
 
@@ -129,10 +136,13 @@ result = run(jobs_with_letters, dry_run=False)
 | Plataforma | Estado | Empresas |
 |---|---|---|
 | Workable | ✅ Funcional | Platzi, Canonical, Loft |
-| Teamtailor | 🔧 En desarrollo | Global66, Buk |
+| Teamtailor | ❌ No funcional (cookie wall) | Global66, Loft |
+| Greenhouse | 📋 Pendiente (factible) | Canonical |
 | Ashby | 📋 Pendiente | Addi |
-| Workday | 📋 Pendiente | Amadeus, Oracle |
-| Greenhouse | 📋 Pendiente | - |
+| Workday | 📋 No viable (login/anti-bot) | Amadeus, Oracle, BBVA |
+
+> Nota: Workday y Oracle Cloud exigen crear cuenta con login + verificacion email, por lo que
+> no son automatizables de forma confiable; se postulan manualmente.
 
 ### CLI directo
 
