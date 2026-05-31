@@ -1,0 +1,23 @@
+Asunto: Postulación Backend Engineer IC2 - Addi Colombia
+
+Estimado equipo de Addi Colombia,
+
+Me dirijo a ustedes para postularme al cargo de Backend Engineer IC2 en Addi, una fintech colombiana cuyo compromiso con la innovación en plataformas de pago, créditos y banking admiro profundamente.
+
+Mi nombre es Mickaell Moran y soy desarrollador backend con experiencia sólida en Python, Django, PostgreSQL y diseño de APIs REST. Actualmente, co-fundador de EcuaInventario, un SaaS gastronómico multitenancy donde desarrollo backend con Django 5, Django REST Framework y PostgreSQL, integrando inteligencia artificial para optimizar procesos. Esta experiencia me ha permitido diseñar microservicios escalables y bases de datos relacionales eficientes, competencias clave para el puesto.
+
+Adicionalmente, he trabajado como freelance desarrollando sistemas clínicos y facturadores en producción, utilizando Python, React y PostgreSQL, demostrando capacidad para entregar soluciones robustas en entornos remotos. Mi stack incluye también FastAPI, Docker, Linux y Git, herramientas esenciales para el ecosistema tecnológico de Addi.
+
+Estoy ubicado en Guayaquil, Ecuador, con disponibilidad inmediata para trabajar remoto desde Colombia. Me entusiasma la oportunidad de contribuir al equipo de ingeniería de Addi y crecer profesionalmente en una empresa que transforma el sector financiero.
+
+Quedo atento a su respuesta para ampliar mi experiencia en una entrevista.
+
+Saludos cordiales,
+
+Mickaell Moran
+Email: mickaelmoranvera03@gmail.com
+Teléfono: +593 98 377 7036
+LinkedIn: https://www.linkedin.com/in/mickaell-moran-vera-ba421a2a3/
+GitHub: https://github.com/Mickaell22
+
+CV adjunto: CV_Mickaell_Moran.pdf

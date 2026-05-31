@@ -6,3 +6,7 @@ profile/cv.md
 profile/cv.pdf
 profile/CV_*.pdf
 *.pdf
+
+# Cartas generadas — contienen datos de contacto reales (PII), no versionar
+output/cartas/
+output/
