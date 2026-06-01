@@ -73,7 +73,7 @@ def detect_platform(url: str) -> str:
         return "ashby"
     elif "workday.com" in url_lower or "myworkdayjobs" in url_lower:
         return "workday"
-    elif "greenhouse.io" in url_lower:
+    elif "greenhouse.io" in url_lower or "grnh.se" in url_lower:
         return "greenhouse"
     elif "lever.co" in url_lower:
         return "lever"
@@ -191,6 +191,119 @@ def apply_workable(page, url: str, cover_letter: str, cv_abs_path: str) -> dict:
     return {"ok": True, "fields": fields_filled, "platform": "workable", "ready": True}
 
 
+def apply_greenhouse(page, url: str, cover_letter: str, cv_abs_path: str) -> dict:
+    """Postula en Greenhouse (boards.greenhouse.io)."""
+    print("  [Greenhouse] Navegando...")
+    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    page.wait_for_timeout(2000)
+    dismiss_cookies(page)
+
+    # Greenhouse a veces muestra la oferta y hay que clickear Apply,
+    # otras veces carga directamente el formulario
+    apply_selectors = [
+        'a:has-text("Apply for this job")',
+        'a:has-text("Apply now")',
+        'button:has-text("Apply for this job")',
+        'button:has-text("Apply now")',
+        'button:has-text("Apply")',
+        '#apply_button',
+        '.apply-button',
+    ]
+    for sel in apply_selectors:
+        btn = page.query_selector(sel)
+        if btn and btn.is_visible():
+            try:
+                btn.click()
+                page.wait_for_timeout(2000)
+                print(f"  [Greenhouse] Click en Apply ({sel})")
+                break
+            except Exception:
+                pass
+
+    # Esperar formulario — Greenhouse usa #application o carga directa
+    try:
+        page.wait_for_selector('input#first_name, input[name*="first_name"]', timeout=10000)
+    except Exception:
+        pass
+
+    page.wait_for_timeout(1000)
+
+    fields_filled = []
+    name_parts = CANDIDATE["name"].split(" ", 1)
+    firstname = name_parts[0]
+    lastname = name_parts[1] if len(name_parts) > 1 else ""
+
+    # Campos estándar de Greenhouse — IDs reales del formulario
+    greenhouse_fields = [
+        (['input#first_name', 'input[name*="first_name"]'], firstname),
+        (['input#last_name', 'input[name*="last_name"]'], lastname),
+        (['input#email', 'input[name*="[email]"]', 'input[type="email"]'], CANDIDATE["email"]),
+        (['input#phone', 'input[name*="[phone]"]', 'input[type="tel"]'], CANDIDATE["phone"]),
+    ]
+
+    for selectors, value in greenhouse_fields:
+        for sel in selectors:
+            el = page.query_selector(sel)
+            if el:
+                try:
+                    el.fill(value)
+                    fields_filled.append(sel.split("#")[-1].split("[")[-1].rstrip("]"))
+                    break
+                except Exception:
+                    pass
+
+    # LinkedIn — Greenhouse suele tenerlo como pregunta custom con label
+    for label in page.query_selector_all("label"):
+        text = (label.inner_text() or "").lower()
+        if "linkedin" in text:
+            input_id = label.get_attribute("for")
+            if input_id:
+                el = page.query_selector(f"#{input_id}")
+                if el:
+                    try:
+                        el.fill(CANDIDATE["linkedin"])
+                        fields_filled.append("linkedin")
+                    except Exception:
+                        pass
+            break
+
+    print(f"  [Greenhouse] Campos llenados: {fields_filled}")
+
+    # Subir CV — Greenhouse puede tener input#resume o un drop-zone
+    resume_selectors = ['input#resume', 'input[name*="resume"]', 'input[type="file"]']
+    for sel in resume_selectors:
+        file_input = page.query_selector(sel)
+        if file_input:
+            try:
+                file_input.set_input_files(cv_abs_path)
+                print(f"  [Greenhouse] CV subido: {cv_abs_path}")
+                page.wait_for_timeout(2000)
+                break
+            except Exception as e:
+                print(f"  [Greenhouse] Error subiendo CV con {sel}: {e}")
+
+    # Cover letter — textarea#cover_letter o área de texto libre
+    cl_selectors = [
+        'textarea#cover_letter',
+        'textarea[name*="cover_letter"]',
+        'textarea[placeholder*="cover"]',
+        'textarea[placeholder*="Cover"]',
+        'textarea',
+    ]
+    for sel in cl_selectors:
+        textarea = page.query_selector(sel)
+        if textarea and textarea.is_visible():
+            try:
+                textarea.fill(cover_letter)
+                print(f"  [Greenhouse] Cover letter pegada ({sel})")
+                break
+            except Exception:
+                pass
+
+    page.wait_for_timeout(1000)
+    return {"ok": True, "fields": fields_filled, "platform": "greenhouse", "ready": True}
+
+
 def apply_teamtailor(page, url: str, cover_letter: str, cv_abs_path: str) -> dict:
     """Postula en Teamtailor."""
     print("  [Teamtailor] Navegando...")
@@ -270,6 +383,8 @@ def apply(page, url: str, cover_letter: str, cv_abs_path: str) -> dict:
 
     if platform == "workable":
         return apply_workable(page, url, cover_letter, cv_abs_path)
+    elif platform == "greenhouse":
+        return apply_greenhouse(page, url, cover_letter, cv_abs_path)
     elif platform == "teamtailor":
         return apply_teamtailor(page, url, cover_letter, cv_abs_path)
     else:

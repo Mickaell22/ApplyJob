@@ -27,16 +27,18 @@ ofertas --------->| Scraper  |--->| Matcher  |--->| Cover   |--->| Apply ATS |--
 ApplyJob/
 ├── main.py              # orquestador del pipeline
 ├── profile/
-│   ├── cv.md            # perfil del candidato en español (stack, experiencia, skills)
-│   ├── cv_en.md         # perfil del candidato en ingles (ofertas en ingles)
-│   ├── CV_Mickaell_Moran.pdf  # CV en PDF para adjuntar
-│   └── cv_template.md   # template de perfil
+│   ├── cv.md                    # perfil del candidato en español
+│   ├── cv_en.md                 # perfil del candidato en ingles
+│   ├── CV_Mickaell_Moran.pdf    # CV en PDF (español)
+│   ├── CV_Mickaell_Moran_EN.pdf # CV en PDF (ingles)
+│   └── cv_template.md           # template de perfil
 ├── src/
 │   ├── scraper.py       # extrae informacion de ofertas desde URLs
 │   ├── profile.py       # carga y parsea el CV/perfil
 │   ├── matcher.py       # calcula compatibilidad oferta vs perfil
 │   ├── cover.py         # genera carta via DeepSeek Flash (es/en via param lang)
-│   ├── apply_ats.py     # auto-postulacion en ATS via Playwright
+│   ├── apply_ats.py     # auto-postulacion en ATS via Playwright (soporta lang=en)
+│   ├── letter_to_pdf.py # convierte cartas .txt a PDF via python-docx + LibreOffice
 │   ├── inbox.py         # lector IMAP para boletines
 │   └── sender.py        # envia correo via Gmail SMTP
 ├── samples/             # boletines de ofertas guardados
@@ -81,6 +83,7 @@ DEEPSEEK_API_KEY=sk-...
 GMAIL_USER=tu-correo@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 CV_PATH=./profile/CV_Mickaell_Moran.pdf
+CV_PATH_EN=./profile/CV_Mickaell_Moran_EN.pdf
 
 # Datos del candidato (apply_ats.py los usa para llenar formularios ATS)
 CANDIDATE_NAME=...
@@ -115,6 +118,13 @@ python run_today.py
 
 Las cartas en ingles se generan con `cover.generate(job, cv, lang="en")` (ej. Canonical).
 
+### Generar PDF de una carta
+
+```bash
+python src/letter_to_pdf.py output/cartas/07_Canonical_SWE_Python_Cloud.txt
+# genera output/cartas/07_Canonical_SWE_Python_Cloud.pdf
+```
+
 ### Auto-postulacion en ATS
 
 ```python
@@ -136,8 +146,8 @@ result = run(jobs_with_letters, dry_run=False)
 | Plataforma | Estado | Empresas |
 |---|---|---|
 | Workable | ✅ Funcional | Platzi, Canonical, Loft |
+| Greenhouse | ✅ Implementado | Canonical |
 | Teamtailor | ❌ No funcional (cookie wall) | Global66, Loft |
-| Greenhouse | 📋 Pendiente (factible) | Canonical |
 | Ashby | 📋 Pendiente | Addi |
 | Workday | 📋 No viable (login/anti-bot) | Amadeus, Oracle, BBVA |
 

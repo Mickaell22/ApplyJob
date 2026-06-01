@@ -10,7 +10,8 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `src/scraper.py` — extrae info de ofertas desde URLs (httpx + Playwright fallback)
 - `src/matcher.py` — calcula % de compatibilidad oferta vs perfil
 - `src/cover.py` — genera carta personalizada con DeepSeek Flash (via Anthropic SDK)
-- `src/apply_ats.py` — auto-postulacion en ATS con Playwright (Workable funcional)
+- `src/apply_ats.py` — auto-postulacion en ATS con Playwright (Workable funcional); soporta `lang="en"` para subir CV EN
+- `src/letter_to_pdf.py` — convierte cartas .txt a PDF via python-docx + LibreOffice
 - `src/sender.py` — envia carta por Gmail SMTP
 - `src/inbox.py` — lector IMAP para boletines de ofertas
 - `run_batch.py` — batch: resuelve short URLs, scrapea con Playwright y genera cartas
@@ -18,8 +19,10 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `run_today.py` — genera cartas para la shortlist de ofertas de la fecha actual
 - `profile/cv.md` — perfil del candidato en español (stack, experiencia, skills)
 - `profile/cv_en.md` — perfil del candidato en INGLES (para ofertas en ingles, ej. Canonical)
-- `profile/CV_Mickaell_Moran.pdf` — CV en PDF para adjuntar (en español)
+- `profile/CV_Mickaell_Moran.pdf` — CV en PDF (español)
+- `profile/CV_Mickaell_Moran_EN.pdf` — CV en PDF (ingles, para Canonical y ofertas EN)
 - `output/cartas/` — cartas generadas (GITIGNORED: contienen datos de contacto reales/PII)
+- `output/canonical_form_answers.txt` — respuestas reutilizables para formularios Canonical (GITIGNORED)
 - `samples/` — boletines de ofertas guardados
 
 ## ATS Auto-Apply Module (`src/apply_ats.py`)
@@ -28,11 +31,11 @@ Usa Playwright headless Chromium para llenar formularios de postulacion.
 
 **Plataformas soportadas:**
 - Workable ✅ — Platzi, Canonical, Loft
+- Greenhouse ✅ — Canonical (handler completo; pendiente test real)
 - Teamtailor ❌ — Global66, Loft (PROBADO 2026-05-31: NO funciona; cookie wall + timeout en dry_run)
 - Ashby 📋 — Addi (pendiente)
 - Workday 📋 — Amadeus, Oracle, BBVA (pendiente; requiere crear cuenta/login, anti-bot)
-- Greenhouse 📋 — Canonical (pendiente; factible, formularios estandar)
-- Sitios propios 📋 — Canonical careers, Addi (custom, caso por caso)
+- Sitios propios 📋 — Addi (custom, caso por caso)
 
 **Funcionamiento:**
 1. Navega a la URL de la oferta
@@ -45,7 +48,9 @@ Usa Playwright headless Chromium para llenar formularios de postulacion.
 
 **Modo dry_run:** `run(jobs_with_letters, dry_run=True)` — llena formulario pero NO hace submit.
 
-**Candidate data:** El dict `CANDIDATE` se carga 100% desde `.env` (CANDIDATE_NAME, _PHONE, _LOCATION, _CITY, _COUNTRY, _LINKEDIN, _GITHUB, _WEBSITE + GMAIL_USER, CV_PATH). Sin PII hardcodeada en el repo.
+**Candidate data:** El dict `CANDIDATE` se carga 100% desde `.env` (CANDIDATE_NAME, _PHONE, _LOCATION, _CITY, _COUNTRY, _LINKEDIN, _GITHUB, _WEBSITE + GMAIL_USER, CV_PATH, CV_PATH_EN). Sin PII hardcodeada en el repo.
+
+**Soporte bilingüe:** `run(jobs_with_letters, lang="en")` usa `CV_PATH_EN` (PDF EN) en lugar del PDF ES. Default `lang="es"`.
 
 ## CV / Profile
 
@@ -77,6 +82,7 @@ DEEPSEEK_API_KEY=sk-...
 GMAIL_USER=tu-correo@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 CV_PATH=./profile/CV_Mickaell_Moran.pdf
+CV_PATH_EN=./profile/CV_Mickaell_Moran_EN.pdf
 
 # Datos del candidato (apply_ats.py los usa para llenar formularios ATS)
 CANDIDATE_NAME=...
@@ -89,14 +95,15 @@ CANDIDATE_GITHUB=...
 CANDIDATE_WEBSITE=
 ```
 
-## Current State (2026-05-31)
+## Current State (2026-06-01)
 
-- CV bilingüe: `profile/cv.md` (ES) + `profile/cv_en.md` (EN). PDF EN pendiente (se generará desde el portafolio).
-- `cover.generate` soporta `lang="es"/"en"`.
-- Cartas para boletin 2026-05-31 generadas en `output/cartas/` (06-14): Global66, Canonical x4 (EN), BBVA, Oracle, Loft, Addi.
-- `CANDIDATE` movido 100% a `.env` (sin PII en repo). Cartas y CVs gitignored.
-- Restriccion del candidato: SOLO remoto-real (estudiante en Guayaquil, sin reubicacion). Canonical = mejor caja de oportunidades (remoto global, junior/graduate, Python/Linux).
-- To-do: arreglar handler Teamtailor (roto), agregar Greenhouse, i18n del portafolio (ES/EN) para CV bilingüe descargable.
+- CV bilingüe completo: `profile/cv.md` (ES) + `profile/cv_en.md` (EN) + PDFs en ambos idiomas.
+- `cover.generate` soporta `lang="es"/"en"`. `apply_ats.run()` soporta `lang="en"` para subir CV EN.
+- `src/letter_to_pdf.py` — genera PDFs de cartas desde .txt via python-docx + LibreOffice.
+- Postulaciones enviadas (boletin 2026-05-31): Canonical x4 EN (07,12,13,14 — manuales, Canonical prohibe IA) + Addi CyberSec (11). Confirmacion Greenhouse recibida para las 4 de Canonical.
+- `output/canonical_form_answers.txt` — respuestas reutilizables para proximas aplicaciones Canonical (gitignored, en disco).
+- Restriccion del candidato: SOLO remoto-real (estudiante en Guayaquil, sin reubicacion). Canonical = mejor caja (remoto global, junior/graduate, Python/Linux).
+- To-do: arreglar handler Teamtailor (roto), agregar Ashby (Addi), seguimiento proceso Canonical (written interview + Devskiller), test real Greenhouse con oferta Canonical.
 
 ## Common Issues
 
