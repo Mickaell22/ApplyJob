@@ -28,6 +28,7 @@ CANDIDATE = {
     "linkedin": os.getenv("CANDIDATE_LINKEDIN", ""),
     "github": os.getenv("CANDIDATE_GITHUB", ""),
     "cv_path": os.getenv("CV_PATH", "profile/CV_Mickaell_Moran.pdf"),
+    "cv_path_en": os.getenv("CV_PATH_EN", "profile/CV_Mickaell_Moran_EN.pdf"),
     "website": os.getenv("CANDIDATE_WEBSITE", ""),
 }
 
@@ -275,9 +276,10 @@ def apply(page, url: str, cover_letter: str, cv_abs_path: str) -> dict:
         return {"error": f"Plataforma no soportada: {platform}"}
 
 
-def run(jobs_with_letters: list[dict], dry_run: bool = True) -> list[dict]:
+def run(jobs_with_letters: list[dict], dry_run: bool = True, lang: str = "es") -> list[dict]:
     """Ejecuta postulaciones para una lista de (job, cover_letter)."""
-    cv_abs_path = str(Path(cv_path_resolve()))
+    cv_key = "cv_path_en" if lang == "en" else "cv_path"
+    cv_abs_path = str(Path(cv_path_resolve(cv_key)))
 
     if not os.path.exists(cv_abs_path):
         return [{"error": f"CV no encontrado en {cv_abs_path}"}]
@@ -354,9 +356,9 @@ def run(jobs_with_letters: list[dict], dry_run: bool = True) -> list[dict]:
     return results
 
 
-def cv_path_resolve() -> str:
+def cv_path_resolve(key: str = "cv_path") -> str:
     """Resuelve la ruta absoluta del CV."""
-    path = CANDIDATE["cv_path"]
+    path = CANDIDATE[key]
     if not os.path.isabs(path):
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.path.normpath(os.path.join(base, path))
