@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .venv/
 profile/cv.md
+profile/getonboard_bio.txt
+profile/postulaciones.md
 profile/cv_en.md
 profile/cv.pdf
 profile/CV_*.pdf
@@ -11,3 +13,4 @@ profile/CV_*.pdf
 # Cartas generadas — contienen datos de contacto reales (PII), no versionar
 output/cartas/
 output/
+.gob_session.json

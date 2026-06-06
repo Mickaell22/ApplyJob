@@ -10,19 +10,23 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `src/scraper.py` — extrae info de ofertas desde URLs (httpx + Playwright fallback)
 - `src/matcher.py` — calcula % de compatibilidad oferta vs perfil
 - `src/cover.py` — genera carta personalizada con DeepSeek Flash (via Anthropic SDK)
-- `src/apply_ats.py` — auto-postulacion en ATS con Playwright (Workable funcional); soporta `lang="en"` para subir CV EN
+- `src/apply_ats.py` — auto-postulacion en ATS con Playwright; soporta Workable, Greenhouse, GetOnBrd (con sesion)
+- `src/boards.py` — descubre ofertas desde tableros: GetOnBrd (API JSON) y Glovo Careers; incluye filtros junior/entry-level
 - `src/letter_to_pdf.py` — convierte cartas .txt a PDF via python-docx + LibreOffice
 - `src/sender.py` — envia carta por Gmail SMTP
 - `src/inbox.py` — lector IMAP para boletines de ofertas
 - `run_batch.py` — batch: resuelve short URLs, scrapea con Playwright y genera cartas
 - `run_manual.py` — batch con descripciones manuales (cuando el scraping falla)
 - `run_today.py` — genera cartas para la shortlist de ofertas de la fecha actual
+- `run_discover.py` — pipeline completo: descubre boards → filtra → genera cartas → auto-aplica
+- `setup_gob_session.py` — guarda sesion GetOnBrd una vez (magic link); requerido para auto-apply en GetOnBrd
 - `profile/cv.md` — perfil del candidato en español (stack, experiencia, skills)
 - `profile/cv_en.md` — perfil del candidato en INGLES (para ofertas en ingles, ej. Canonical)
 - `profile/CV_Mickaell_Moran.pdf` — CV en PDF (español)
 - `profile/CV_Mickaell_Moran_EN.pdf` — CV en PDF (ingles, para Canonical y ofertas EN)
 - `output/cartas/` — cartas generadas (GITIGNORED: contienen datos de contacto reales/PII)
 - `output/canonical_form_answers.txt` — respuestas reutilizables para formularios Canonical (GITIGNORED)
+- `.gob_session.json` — sesion guardada de GetOnBrd para auto-apply (GITIGNORED)
 - `samples/` — boletines de ofertas guardados
 
 ## ATS Auto-Apply Module (`src/apply_ats.py`)
@@ -32,6 +36,7 @@ Usa Playwright headless Chromium para llenar formularios de postulacion.
 **Plataformas soportadas:**
 - Workable ✅ — Platzi, Canonical, Loft
 - Greenhouse ✅ — Canonical (handler completo; pendiente test real)
+- GetOnBrd ✅ — requiere sesion guardada via `setup_gob_session.py`; usa `apply_getonbrd()` con storage_state
 - Teamtailor ❌ — Global66, Loft (PROBADO 2026-05-31: NO funciona; cookie wall + timeout en dry_run)
 - Ashby 📋 — Addi (pendiente)
 - Workday 📋 — Amadeus, Oracle, BBVA (pendiente; requiere crear cuenta/login, anti-bot)
@@ -93,17 +98,62 @@ CANDIDATE_COUNTRY=...
 CANDIDATE_LINKEDIN=...
 CANDIDATE_GITHUB=...
 CANDIDATE_WEBSITE=
+
+# GetOnBrd (opcional — default: .gob_session.json en raiz del proyecto)
+GETONBRD_SESSION_PATH=./.gob_session.json
 ```
 
-## Current State (2026-06-01)
+## Discovery Pipeline (`run_discover.py`)
+
+Pipeline automatico de descubrimiento y postulacion:
+
+```bash
+.venv/bin/python3 run_discover.py              # descubre + aplica en real
+.venv/bin/python3 run_discover.py --dry-run    # llena formularios, NO envia
+.venv/bin/python3 run_discover.py --no-apply   # solo genera cartas
+.venv/bin/python3 run_discover.py getonbrd     # solo GetOnBrd
+```
+
+**Filtros en cascada:**
+1. Keywords tecnicas (python, backend, fullstack, react, etc.)
+2. Sin senior/lead/architect/ssr en titulo (`_SENIOR_EXCLUDE` regex)
+3. Sin "3+ años de experiencia" en descripcion (`_EXP_EXCLUDE` regex)
+
+**Resultado tipico:** 150 ofertas GetOnBrd → ~80 sin senior → ~26 cartas generadas
+
+**GetOnBrd session setup (una vez):**
+```bash
+.venv/bin/python3 setup_gob_session.py
+```
+Abre browser visible → ingresas email → GetOnBrd manda magic link → copiás la URL del link (clic derecho, NO abrirlo) → la pegás en la terminal → sesión guardada en `.gob_session.json`.
+IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal), NO en el browser normal.
+
+## `src/boards.py` — Board Scrapers
+
+- `discover_getonbrd(remote_only, max_pages)` — API JSON de getonbrd (`/api/v0/categories/programming/jobs`); formato JSON:API; URL en `item["links"]["public_url"]`; descripcion en `attrs["description"]` (HTML)
+- `discover_glovo(tech_only)` — Playwright en `careers.glovoapp.com` (actualmente 0 resultados, pendiente fix)
+- `filter_tech(jobs)` — keywords tecnicas en titulo
+- `filter_junior(jobs)` — excluye senior/lead/ssr/etc en titulo
+- `filter_entry_level(jobs)` — excluye si descripcion pide 3+ años
+- `getonbrd_apply_url(url)` — retorna `{url}/applications/new`
+- `resolve_apply_url(url)` — intenta encontrar URL ATS externa via Playwright (mayoría de GetOnBrd es nativo, no externo)
+
+## Current State (2026-06-06)
 
 - CV bilingüe completo: `profile/cv.md` (ES) + `profile/cv_en.md` (EN) + PDFs en ambos idiomas.
 - `cover.generate` soporta `lang="es"/"en"`. `apply_ats.run()` soporta `lang="en"` para subir CV EN.
 - `src/letter_to_pdf.py` — genera PDFs de cartas desde .txt via python-docx + LibreOffice.
-- Postulaciones enviadas (boletin 2026-05-31): Canonical x4 EN (07,12,13,14 — manuales, Canonical prohibe IA) + Addi CyberSec (11). Confirmacion Greenhouse recibida para las 4 de Canonical.
-- `output/canonical_form_answers.txt` — respuestas reutilizables para proximas aplicaciones Canonical (gitignored, en disco).
-- Restriccion del candidato: SOLO remoto-real (estudiante en Guayaquil, sin reubicacion). Canonical = mejor caja (remoto global, junior/graduate, Python/Linux).
-- To-do: arreglar handler Teamtailor (roto), agregar Ashby (Addi), seguimiento proceso Canonical (written interview + Devskiller), test real Greenhouse con oferta Canonical.
+- `src/cover.py` actualizado (2026-06-06): reglas de honestidad en prompt ES+EN, lista de techs prohibidas, deteccion automatica de tech desconocida en descripcion, perfil completo sin truncado.
+- Canonical x4 rechazadas (2026-06-03): Graduate Software Engineer / Software Engineer Python Cloud / Junior Software Developer Observability / Junior Ubuntu Software Engineer. Todas filtradas en primera ronda automatica. Reaplicar en 6 meses.
+- `profile/getonboard_bio.txt` — textos del perfil GetOnBoard en ES+EN (gitignored).
+- `profile/postulaciones.md` — tracker de postulaciones enviadas (gitignored).
+- Decision de flujo (2026-06-06): `run_discover.py --no-apply` para filtrar y generar cartas; postulaciones se envian MANUALMENTE desde GetOnBoard. No usar auto-apply para envios reales.
+- Restriccion del candidato: SOLO remoto-real (estudiante en Guayaquil, sin reubicacion).
+- Postulaciones enviadas hoy (2026-06-06): #5 BC Tecnologia Jr, #6 Designcafe Full-Stack Web Developer, #7 BC Tecnologia Full-Stack remote, #8 BC Tecnologia Full-Stack con IA. Total: 8 postulaciones (4 Canonical rechazadas).
+- Fixes en `run_discover.py` + `src/boards.py` (2026-06-06): colision de nombres de archivos resuelta (slug desde URL), filtro seniority via API (IDs 4=Senior y 5=Lead excluidos), "intermedio" y "mid-level" añadidos a `_SENIOR_EXCLUDE`.
+- Patron detectado en GetOnBoard: jobs con "santiago" en URL suelen ser hibridos; jobs con "remote" en URL son realmente remotos. Muchos jobs son semi-senior (ID 3) aunque el candidato aplique igual.
+- `output/designcafe_form_answers.txt` — respuestas reutilizables para formularios GetOnBoard (GITIGNORED).
+- To-do: arreglar scraper Glovo (0 resultados); explorar otros boards (LinkedIn, Workana) para mas ofertas junior reales.
 
 ## Common Issues
 
@@ -114,3 +164,7 @@ CANDIDATE_WEBSITE=
 - Workable requiere manejar firstname/lastname separados
 - Muchas ofertas "100% remoto" son remoto DENTRO del pais (ej. Loft Brasil = CLT + portugués); verificar antes de aplicar
 - Workday/Oracle exigen crear cuenta con login + verificación email → no automatizables de forma confiable
+- Glovo Careers (careers.glovoapp.com) devuelve 0 resultados — React SPA, los links de ofertas no se encuentran con Playwright ni httpx
+- GetOnBrd auto-apply requiere sesion activa en `.gob_session.json`. Magic link ES DE UN SOLO USO y expira en ~5 min. Flujo correcto: correr `setup_gob_session.py` → solicitar magic link → en el correo, clic derecho sobre el boton/link → "Copiar dirección" → pegarlo en la terminal del script. NO hacer clic en el link antes de pegarlo (invalida el link al abrirlo en el browser real).
+- GetOnBrd formulario es de 3 pasos: step 1 (cover letter Trix + nivel inglés), step 2 (phone/linkedin/github/reason), step 3 (preview). El submit de cada paso usa fetch() con credentials:include porque el Stimulus controller bloquea form.submit() nativo. GetOnBrd auto-crea drafts al navegar a /applications/new; el fetch bypassea eso.
+- GetOnBrd magic link puede pegarse directamente en `setup_gob_session.py` o ejecutar `python3 -c "..."` headless para autenticar sin browser visible (ver sesion 2026-06-05).

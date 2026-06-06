@@ -79,6 +79,8 @@ def detect_platform(url: str) -> str:
         return "lever"
     elif "breezy.hr" in url_lower:
         return "breezy"
+    elif "getonbrd.com" in url_lower:
+        return "getonbrd"
     else:
         return "unknown"
 
@@ -376,6 +378,178 @@ def apply_teamtailor(page, url: str, cover_letter: str, cv_abs_path: str) -> dic
     return {"ok": True, "fields": fields_filled, "platform": "teamtailor", "ready": True}
 
 
+_GOB_SESSION = os.getenv(
+    "GETONBRD_SESSION_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".gob_session.json"),
+)
+
+
+def apply_getonbrd(context, url: str, cover_letter: str, cv_abs_path: str, dry_run: bool = False) -> dict:
+    """Postula en GetOnBrd usando sesión guardada (.gob_session.json).
+
+    GetOnBrd usa un formulario de 3 pasos:
+      Step 1 (experience): cover letter (Trix editor) + nivel de inglés
+      Step 2 (basic):      phone, linkedin, github, salary, reason_to_apply
+      Step 3 (preview):    revisión antes del submit final
+
+    Nota: GetOnBrd auto-crea un draft al navegar a /applications/new.
+    Para drafts existentes (/edit) se salta directamente al step 2.
+    Requiere haber corrido `setup_gob_session.py` al menos una vez.
+    """
+    if not os.path.exists(_GOB_SESSION):
+        return {
+            "error": (
+                "Sesión de GetOnBrd no encontrada. "
+                "Corre `python setup_gob_session.py` para guardarla."
+            )
+        }
+
+    print("  [GetOnBrd] Navegando con sesión guardada...")
+    page = context.new_page()
+    page.goto(url, wait_until="networkidle", timeout=30000)
+    page.wait_for_timeout(2000)
+
+    if "/login" in page.url or "/auth" in page.url:
+        page.close()
+        return {"error": "Sesión GetOnBrd expirada — corre setup_gob_session.py de nuevo"}
+
+    # Aceptar cookies
+    cookie_btn = page.query_selector("#accept_cookies button")
+    if cookie_btn:
+        cookie_btn.click()
+        page.wait_for_timeout(800)
+
+    fields_filled = []
+
+    # ---- Step 1: Experience ------------------------------------------------
+    trix = page.query_selector("trix-editor#trix-professional")
+    if not trix:
+        page.close()
+        return {"error": "No se encontró el editor de cover letter (trix-professional)"}
+
+    # Limpiar contenido previo y escribir la nueva carta
+    trix.click()
+    page.keyboard.press("Control+a")
+    page.keyboard.type(cover_letter)
+    page.wait_for_timeout(300)
+    fields_filled.append("cover_letter")
+    print("  [GetOnBrd] Step 1: cover letter llenada")
+
+    # Nivel de inglés — solo en aplicaciones nuevas; required para que el server valide step 1
+    # Verificar si el campo existe antes de intentar seleccionar
+    eng_field = page.query_selector("#webpro_english_level")
+    if eng_field:
+        # Usar evaluate sin return statement (directamente la expresión)
+        page.evaluate('document.querySelector(\'li[data-value="upper_intermediate"]\').click()')
+        page.wait_for_timeout(300)
+        eng_val = page.evaluate("document.querySelector('#webpro_english_level').value")
+        if eng_val:
+            fields_filled.append("english_level")
+
+    # Enviar step 1 via fetch (bypass Stimulus controller que bloquea form.submit)
+    # credentials: 'include' es necesario para enviar las cookies de sesión
+    step1_result = page.evaluate("""
+        async () => {
+            const form = document.querySelector('#job-application-form');
+            const data = new FormData(form);
+            const body = new URLSearchParams([...data.entries()]).toString();
+            try {
+                const resp = await fetch(form.action, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'text/html,application/xhtml+xml,*/*',
+                    },
+                    body: body,
+                    redirect: 'follow'
+                });
+                return { status: resp.status, url: resp.url };
+            } catch(e) {
+                return { error: String(e) };
+            }
+        }
+    """)
+
+    if step1_result.get("error"):
+        page.close()
+        return {"error": f"Step 1 fetch error: {step1_result['error']}"}
+
+    step2_url = step1_result.get("url", "")
+    if not step2_url or "/edit" not in step2_url:
+        page.close()
+        return {"error": f"Step 1 no navegó a step 2 — respuesta: {step1_result}"}
+
+    # Navegar la página al step 2 (el fetch no navega el browser)
+    try:
+        page.goto(step2_url, wait_until="networkidle", timeout=20000)
+        page.wait_for_timeout(1500)
+    except Exception:
+        page.wait_for_timeout(3000)
+
+    if "/edit" not in page.url:
+        page.close()
+        return {"error": f"Step 2 no cargó — URL: {page.url}"}
+
+    print(f"  [GetOnBrd] Step 2 cargado")
+
+    # ---- Step 2: Basic info ------------------------------------------------
+    for field, value in [
+        ('input[name="webpro[phone]"]',    CANDIDATE["phone"]),
+        ('input[name="webpro[linkedin]"]', CANDIDATE["linkedin"]),
+        ('input[name="webpro[github]"]',   CANDIDATE["github"]),
+    ]:
+        el = page.query_selector(field)
+        if el and el.is_visible():
+            try:
+                el.fill(value)
+                fields_filled.append(field.split('"')[1])
+            except Exception:
+                pass
+
+    # Reason to apply — primeras palabras de la cover letter (max 280 chars)
+    reason_ta = page.query_selector('textarea[name="job_application[reason_to_apply]"]')
+    if reason_ta and reason_ta.is_visible():
+        short_reason = cover_letter[:280].rsplit(" ", 1)[0]
+        reason_ta.fill(short_reason)
+        fields_filled.append("reason_to_apply")
+
+    print(f"  [GetOnBrd] Campos llenados: {fields_filled}")
+
+    # dry_run: quedarse en step 2 sin enviar la postulación
+    if dry_run:
+        print("  [GetOnBrd] Dry-run: formulario listo en step 2, NO se envía")
+        return {"ok": True, "fields": fields_filled, "platform": "getonbrd", "ready": True, "page": page}
+
+    # Enviar step 2 via fetch → postulación real enviada
+    step2_result = page.evaluate("""
+        async () => {
+            const form = document.querySelector('#job-application-form');
+            const data = new FormData(form);
+            const body = new URLSearchParams([...data.entries()]).toString();
+            try {
+                const resp = await fetch(form.action, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'text/html,application/xhtml+xml,*/*',
+                    },
+                    body: body,
+                    redirect: 'follow'
+                });
+                return { status: resp.status, url: resp.url };
+            } catch(e) {
+                return { error: String(e) };
+            }
+        }
+    """)
+    if step2_result.get("ok") is not False:
+        print(f"  [GetOnBrd] Postulación enviada — {step2_result.get('url', '?').split('?')[-1]}")
+
+    return {"ok": True, "fields": fields_filled, "platform": "getonbrd", "ready": True, "page": page}
+
+
 def apply(page, url: str, cover_letter: str, cv_abs_path: str) -> dict:
     """Detecta plataforma y aplica."""
     platform = detect_platform(url)
@@ -389,6 +563,16 @@ def apply(page, url: str, cover_letter: str, cv_abs_path: str) -> dict:
         return apply_teamtailor(page, url, cover_letter, cv_abs_path)
     else:
         return {"error": f"Plataforma no soportada: {platform}"}
+
+
+def apply_with_context(context, url: str, cover_letter: str, cv_abs_path: str, dry_run: bool = False) -> dict:
+    """Versión de apply() que usa un browser context existente (para GetOnBrd con sesión)."""
+    platform = detect_platform(url)
+    print(f"  Plataforma: {platform}")
+    if platform == "getonbrd":
+        return apply_getonbrd(context, url, cover_letter, cv_abs_path, dry_run=dry_run)
+    page = context.new_page()
+    return apply(page, url, cover_letter, cv_abs_path)
 
 
 def run(jobs_with_letters: list[dict], dry_run: bool = True, lang: str = "es") -> list[dict]:
