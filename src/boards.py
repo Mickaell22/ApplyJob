@@ -1,12 +1,15 @@
 """Descubre ofertas laborales desde tableros de trabajo.
 
 Boards soportados:
-- getonbrd  : GetOnBrd LATAM  (getonbrd.com)     — API JSON + fallback HTML
-- himalayas : Himalayas.app   (himalayas.app)    — API JSON pública, global remote, filtro Entry-level
-- remotive  : Remotive.io     (remotive.com)     — API JSON pública, global remote
-- glovo     : Glovo Careers   (careers.glovoapp.com) — Playwright
+- getonbrd      : GetOnBrd LATAM    (getonbrd.com)          — API JSON + fallback HTML
+- himalayas     : Himalayas.app     (himalayas.app)         — API JSON pública, global remote, filtro Entry-level
+- workingnomads : Working Nomads    (workingnomads.com)     — API JSON pública, 100% remoto
+- remotive      : Remotive.io       (remotive.com)          — API JSON pública, global remote
+- glovo         : Glovo Careers     (careers.glovoapp.com)  — Playwright
 """
 
+import json
+import os
 import re
 import httpx
 from bs4 import BeautifulSoup
@@ -176,9 +179,10 @@ _LOCATION_EXCLUDE = re.compile(
 )
 
 # Locations que confirman acceso desde Ecuador/LATAM
+# NO incluir "Remote" suelto — "Japan - Remote" lo matchearía como falso positivo
 _LOCATION_OK = re.compile(
     r"\b(Worldwide|Anywhere|Global|LATAM|Latin America|South America|"
-    r"Remote|Americas|International)\b",
+    r"Americas|International|not in the US|not US)\b",
     re.I,
 )
 
@@ -211,6 +215,241 @@ def discover_remotive(category: str = "software-dev") -> list[dict]:
         return jobs
     except Exception:
         return []
+
+
+# ---------------------------------------------------------------------------
+# We Work Remotely (weworkremotely.com)
+# ---------------------------------------------------------------------------
+
+_WWR_FEEDS = [
+    "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+    "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss",
+    "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss",
+]
+
+
+def discover_weworkremotely() -> list[dict]:
+    """Descubre ofertas en weworkremotely.com via RSS público (sin auth).
+
+    Parsea feeds de Programming, Full-Stack y DevOps/SysAdmin.
+    Campo <region> del item RSS → location_required para filter_global_remote.
+    Título formato "Company: Job Title" → separa empresa y puesto.
+    """
+    from xml.etree import ElementTree as ET
+
+    seen: set[str] = set()
+    jobs: list[dict] = []
+
+    for feed_url in _WWR_FEEDS:
+        try:
+            r = httpx.get(feed_url, headers=_HEADERS, timeout=15)
+            r.raise_for_status()
+            root = ET.fromstring(r.text)
+
+            for item in root.findall(".//item"):
+                guid = (item.findtext("guid") or "").strip()
+                if not guid or guid in seen:
+                    continue
+
+                title_raw = (item.findtext("title") or "").strip()
+                if ": " in title_raw:
+                    company, title = title_raw.split(": ", 1)
+                else:
+                    company, title = "", title_raw
+
+                region = (item.findtext("region") or "Worldwide").strip()
+                link   = (item.findtext("link")   or "").strip()
+                desc   = (item.findtext("description") or "").strip()
+
+                seen.add(guid)
+                jobs.append({
+                    "title":             title,
+                    "company":           company,
+                    "url":               link,
+                    "remote":            True,
+                    "source":            "weworkremotely",
+                    "description":       desc,
+                    "location_required": region,
+                })
+        except Exception:
+            continue
+
+    return jobs
+
+
+# ---------------------------------------------------------------------------
+# 4 Day Week (4dayweek.io)
+# ---------------------------------------------------------------------------
+
+_4DW_API = "https://4dayweek.io/api/v2/jobs"
+
+
+def discover_4dayweek(max_pages: int = 6) -> list[dict]:
+    """Descubre ofertas en 4dayweek.io via API pública (sin auth).
+
+    Filtra por work_arrangement=remote y level=entry,mid.
+    El campo url apunta a la página del job en 4dayweek.io donde el candidato
+    puede ver los detalles y hacer click en Apply.
+    """
+    seen: set[str] = set()
+    jobs: list[dict] = []
+
+    for page in range(1, max_pages + 1):
+        try:
+            r = httpx.get(
+                _4DW_API,
+                params={"work_arrangement": "remote", "level": "entry,mid", "page": page},
+                headers={**_HEADERS, "Accept": "application/json"},
+                timeout=15,
+            )
+            r.raise_for_status()
+            data   = r.json()
+            items  = data.get("data", [])
+            if not items:
+                break
+
+            for item in items:
+                job_id = item.get("id", "")
+                if not job_id or job_id in seen:
+                    continue
+
+                # Extraer ubicación primaria para filter_global_remote
+                locs = item.get("locations") or []
+                primary = next((l for l in locs if l.get("is_primary")), locs[0] if locs else {})
+                country = primary.get("country", "") or ""
+
+                seen.add(job_id)
+                jobs.append({
+                    "title":             item.get("title", ""),
+                    "company":           (item.get("company") or {}).get("name", ""),
+                    "url":               item.get("url", ""),
+                    "remote":            True,
+                    "source":            "4dayweek",
+                    "description":       item.get("description", ""),
+                    "location_required": country,
+                })
+
+            if not data.get("has_more"):
+                break
+        except Exception:
+            break
+
+    return jobs
+
+
+# ---------------------------------------------------------------------------
+# Remote First Jobs (remotefirstjobs.com)
+# ---------------------------------------------------------------------------
+
+_RFJ_API  = "https://remotefirstjobs.com/api/search-jobs"
+_RFJ_SENIORITY_OK = {"entry_level", "middle", "intern"}
+_RFJ_QUERIES = ["developer", "engineer", "backend", "fullstack", "python", "react"]
+
+
+def discover_remotefirstjobs(max_pages: int = 2) -> list[dict]:
+    """Descubre ofertas en remotefirstjobs.com via API pública.
+
+    Consulta múltiples keywords tech. Filtra entry_level e intern por seniority.
+    Max 100 jobs/página; API gratuita limita a 5 páginas y 24h de delay.
+    El campo url apunta a la página del job en remotefirstjobs.com.
+    """
+    seen: set[str] = set()
+    jobs: list[dict] = []
+
+    for query in _RFJ_QUERIES:
+        for page in range(1, max_pages + 1):
+            try:
+                r = httpx.get(
+                    _RFJ_API,
+                    params={"query": query, "page": page},
+                    headers={**_HEADERS, "Accept": "application/json"},
+                    timeout=20,
+                )
+                r.raise_for_status()
+                data  = r.json()
+                items = data.get("jobs", [])
+                if not items:
+                    break
+
+                for item in items:
+                    job_id = item.get("id", "")
+                    if not job_id or job_id in seen:
+                        continue
+
+                    seniority = (item.get("seniority") or "").lower()
+                    if seniority and seniority not in _RFJ_SENIORITY_OK:
+                        continue
+
+                    locs = item.get("locations") or []
+                    location = ", ".join(locs) if locs else ""
+
+                    seen.add(job_id)
+                    jobs.append({
+                        "title":             item.get("title", ""),
+                        "company":           item.get("company_name", ""),
+                        "url":               item.get("url", ""),
+                        "remote":            True,
+                        "source":            "remotefirstjobs",
+                        "description":       item.get("description", ""),
+                        "location_required": location,
+                    })
+
+                if len(items) < 100:
+                    break
+            except Exception:
+                break
+
+    return jobs
+
+
+# ---------------------------------------------------------------------------
+# Working Nomads (workingnomads.com)
+# ---------------------------------------------------------------------------
+
+_WN_CATEGORIES = ["programming", "devops-sysadmin"]
+
+
+def discover_workingnomads() -> list[dict]:
+    """Descubre ofertas en workingnomads.com via API pública (sin auth).
+
+    Consulta las categorías programming y devops-sysadmin.
+    Campos de respuesta: url, title, description, company_name, location, pub_date, tags.
+    La url apunta a workingnomads.com/job/go/<id>/ que redirige al ATS de la empresa.
+    El campo location se usa para filtro de país (filter_global_remote).
+    """
+    seen: set[str] = set()
+    jobs: list[dict] = []
+
+    for cat in _WN_CATEGORIES:
+        try:
+            r = httpx.get(
+                "https://www.workingnomads.com/api/exposed_jobs/",
+                params={"category": cat},
+                headers={**_HEADERS, "Accept": "application/json"},
+                timeout=20,
+            )
+            r.raise_for_status()
+            for item in r.json():
+                apply_url = item.get("url", "").strip()
+                if not apply_url or apply_url in seen:
+                    continue
+                seen.add(apply_url)
+
+                location = (item.get("location") or "").strip()
+
+                jobs.append({
+                    "title":             item.get("title", ""),
+                    "company":           item.get("company_name", ""),
+                    "url":               apply_url,
+                    "remote":            True,
+                    "source":            "workingnomads",
+                    "description":       item.get("description", ""),
+                    "location_required": location,
+                })
+        except Exception:
+            continue
+
+    return jobs
 
 
 # ---------------------------------------------------------------------------
@@ -350,12 +589,168 @@ def filter_global_remote(jobs: list[dict]) -> list[dict]:
         if _LOCATION_OK.search(loc):
             result.append(job)
             continue
-        if _LOCATION_EXCLUDE.search(loc) or _REMOTEOK_LOC_EXCLUDE.search(loc):
+        if _LOCATION_EXCLUDE.search(loc):
             continue
         # Ambiguo → incluir con advertencia visible al usuario
         job["location_warning"] = loc
         result.append(job)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Wellfound (ex AngelList) — requiere sesión guardada con setup_wellfound_session.py
+# ---------------------------------------------------------------------------
+
+_WELLFOUND_SESSION = os.getenv(
+    "WELLFOUND_SESSION_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), ".wellfound_session.json"),
+)
+
+# Endpoint GraphQL de Wellfound (reverse-engineered)
+_WELLFOUND_GQL = "https://wellfound.com/graphql?fallbackAOR=talent"
+
+# ID de la operación persistida (puede cambiar si Wellfound actualiza su bundle)
+_WELLFOUND_OP_ID = "tfe/b898ee628dd3385e1b8c467e464a0261ad66c478eda6e21e10566b0ca4ccf1e9"
+
+# Keywords web3/crypto para excluir
+_WELLFOUND_EXCLUDE_KW = ["web3", "crypto", "cryptocurrency", "blockchain", "nft", "defi"]
+
+
+def discover_wellfound(max_pages: int = 5) -> list[dict]:
+    """Descubre ofertas en Wellfound interceptando requests GraphQL del browser.
+
+    Requiere sesión guardada en .wellfound_session.json
+    (correr setup_wellfound_session.py una vez).
+
+    DataDome bloquea headless → usa browser visible (headless=False).
+    Intercepta la request JobSearchResultsX que el browser hace automáticamente.
+
+    Estructura de respuesta:
+      data.talent.jobSearchResults.startups.edges[].node.highlightedJobListings[]
+    """
+    if not os.path.exists(_WELLFOUND_SESSION):
+        print("  [!] Sin sesión Wellfound. Corré: python setup_wellfound_session.py")
+        return []
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("  [!] playwright no instalado")
+        return []
+
+    jobs: list[dict] = []
+    seen: set[str] = set()
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=False,
+                slow_mo=50,
+                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+            )
+            context = browser.new_context(
+                storage_state=_WELLFOUND_SESSION,
+                user_agent=(
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+            )
+            context.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+            )
+
+            has_next = True
+            page_num = 1
+
+            while has_next and page_num <= max_pages:
+                captured: list[dict] = []
+
+                def _on_response(response, _cap=captured):
+                    if "graphql" not in response.url or response.status != 200:
+                        return
+                    try:
+                        op = response.request.post_data_json
+                        if isinstance(op, dict) and op.get("operationName") == "JobSearchResultsX":
+                            _cap.append(response.json())
+                    except Exception:
+                        pass
+
+                page = context.new_page()
+                page.on("response", _on_response)
+
+                # Sin filtro de yearsExperience — nuestros filtros (filter_junior,
+                # filter_entry_level) lo hacen downstream con mejor precisión.
+                url = (
+                    f"https://wellfound.com/jobs?remote=true&jobType=full_time"
+                    f"&page={page_num}"
+                )
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(6000)  # dar tiempo a que carguen los jobs
+                page.close()
+
+                if not captured:
+                    break
+
+                body = captured[-1]  # último response de JobSearchResultsX
+                page_jobs, has_next = _wellfound_parse_response(body)
+
+                for j in page_jobs:
+                    if j["url"] not in seen:
+                        seen.add(j["url"])
+                        jobs.append(j)
+
+                page_num += 1
+
+            browser.close()
+
+    except Exception as e:
+        print(f"  [!] Wellfound error: {e}")
+
+    return jobs
+
+
+def _wellfound_parse_response(body: dict) -> tuple[list[dict], bool]:
+    """Parsea el response JSON de JobSearchResultsX.
+
+    Estructura:
+      body.data.talent.jobSearchResults.startups.edges[].node
+        .highlightedJobListings[].{title, slug, description, ...}
+        .startup.{name, slug}
+    """
+    jobs: list[dict] = []
+    has_next = False
+    try:
+        jsr = body["data"]["talent"]["jobSearchResults"]
+        has_next = jsr.get("hasNextPage", False)
+        edges = jsr.get("startups", {}).get("edges", [])
+
+        for edge in edges:
+            # El node ES la empresa directamente (no tiene .startup anidado)
+            node         = edge.get("node", {})
+            company      = node.get("name", "") or node.get("slug", "")
+            company_slug = node.get("slug", "")
+            listings     = node.get("highlightedJobListings", [])
+
+            for item in listings:
+                title = item.get("title", "")
+                slug  = item.get("slug", "")
+                desc  = item.get("description", "") or ""
+                # URL canónica de Wellfound: /jobs/{company-slug}/{job-slug}
+                apply_url = f"https://wellfound.com/jobs/{company_slug}/{slug}" if slug else ""
+                if not title or not apply_url:
+                    continue
+                jobs.append({
+                    "title":       title,
+                    "company":     company,
+                    "url":         apply_url,
+                    "remote":      True,
+                    "source":      "wellfound",
+                    "description": desc,
+                })
+    except Exception:
+        pass
+
+    return jobs, has_next
 
 
 # ---------------------------------------------------------------------------

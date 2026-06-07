@@ -2,25 +2,31 @@
 """Descubre ofertas nuevas desde tableros, matchea, genera cartas.
 
 Boards:
-  - GetOnBrd  (getonbrd.com)   — ofertas remotas tech en LATAM
-  - Himalayas (himalayas.app)  — API pública global, filtro Entry-level nativo
-  - Remotive  (remotive.com)   — API pública (actualmente limitada a ~28 jobs)
-  - Glovo Careers              — ofertas tech de Glovo
+  - GetOnBrd        (getonbrd.com)          — API JSON, LATAM remoto
+  - Himalayas       (himalayas.app)         — API JSON, global, filtro Entry-level nativo
+  - We Work Remotely(weworkremotely.com)    — RSS, global, jobs de calidad
+  - 4 Day Week      (4dayweek.io)           — API JSON, remoto entry/mid
+  - Remote First Jobs(remotefirstjobs.com)  — API JSON, entry-level, global
+  - Working Nomads  (workingnomads.com)     — API JSON, global, 100% remoto
+  - Remotive        (remotive.com)          — API JSON (limitada a ~28 jobs)
 
 Filtros aplicados automaticamente:
   1. Solo keywords técnicas (python, backend, fullstack, react, etc.)
   2. Sin senior/lead/architect en el título
   3. Sin "3+ años de experiencia" en la descripción
-  4. [Himalayas/Remotive] Sin restricción de país que excluya Ecuador
+  4. Sin restricción de país que excluya Ecuador
 
 Uso:
-  python run_discover.py              # todos los boards + genera cartas
-  python run_discover.py --no-apply   # igual (modo default, sin auto-apply)
-  python run_discover.py getonbrd     # solo GetOnBrd
-  python run_discover.py himalayas    # solo Himalayas
-  python run_discover.py remotive     # solo Remotive
-  python run_discover.py glovo        # solo Glovo
-  python run_discover.py --no-remote  # incluir presenciales
+  python run_discover.py                # todos los boards + genera cartas
+  python run_discover.py --no-apply     # igual (modo default, sin auto-apply)
+  python run_discover.py getonbrd       # solo GetOnBrd
+  python run_discover.py himalayas      # solo Himalayas
+  python run_discover.py weworkremotely # solo We Work Remotely
+  python run_discover.py 4dayweek       # solo 4 Day Week
+  python run_discover.py remotefirstjobs # solo Remote First Jobs
+  python run_discover.py workingnomads  # solo Working Nomads
+  python run_discover.py remotive       # solo Remotive
+  python run_discover.py --no-remote    # incluir presenciales
 """
 
 import re
@@ -40,7 +46,10 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 # Argumentos
 args = sys.argv[1:]
-only_board  = next((a for a in args if a in ("getonbrd", "remotive", "himalayas", "glovo")), None)
+only_board  = next((a for a in args if a in (
+    "getonbrd", "himalayas", "weworkremotely", "4dayweek",
+    "remotefirstjobs", "workingnomads", "remotive", "glovo", "wellfound",
+)), None)
 remote_only = "--no-remote" not in args
 dry_run     = "--dry-run" in args
 no_apply    = "--no-apply" in args
@@ -67,12 +76,46 @@ if not only_board or only_board == "himalayas":
     print(f"  {len(him_jobs)} ofertas → {len(him_global)} sin restricción de país")
     discovered.extend(him_global)
 
+if not only_board or only_board == "weworkremotely":
+    print("\nWe Work Remotely (weworkremotely.com)...")
+    wwr_jobs = boards.discover_weworkremotely()
+    wwr_global = boards.filter_global_remote(wwr_jobs)
+    print(f"  {len(wwr_jobs)} ofertas → {len(wwr_global)} accesibles desde Ecuador")
+    discovered.extend(wwr_global)
+
+if not only_board or only_board == "4dayweek":
+    print("\n4 Day Week (4dayweek.io)...")
+    fdw_jobs = boards.discover_4dayweek()
+    fdw_global = boards.filter_global_remote(fdw_jobs)
+    print(f"  {len(fdw_jobs)} ofertas → {len(fdw_global)} accesibles desde Ecuador")
+    discovered.extend(fdw_global)
+
+if not only_board or only_board == "remotefirstjobs":
+    print("\nRemote First Jobs (remotefirstjobs.com)...")
+    rfj_jobs = boards.discover_remotefirstjobs()
+    rfj_global = boards.filter_global_remote(rfj_jobs)
+    print(f"  {len(rfj_jobs)} ofertas → {len(rfj_global)} accesibles desde Ecuador")
+    discovered.extend(rfj_global)
+
+if not only_board or only_board == "workingnomads":
+    print("\nWorking Nomads (workingnomads.com)...")
+    wn_jobs = boards.discover_workingnomads()
+    wn_global = boards.filter_global_remote(wn_jobs)
+    print(f"  {len(wn_jobs)} ofertas → {len(wn_global)} accesibles desde Ecuador")
+    discovered.extend(wn_global)
+
 if not only_board or only_board == "remotive":
     print("\nRemotive (remotive.com)...")
     remotive_jobs = boards.discover_remotive()
     remotive_global = boards.filter_global_remote(remotive_jobs)
     print(f"  {len(remotive_jobs)} ofertas → {len(remotive_global)} con acceso global/LATAM")
     discovered.extend(remotive_global)
+
+if not only_board or only_board == "wellfound":
+    print("\nWellfound (wellfound.com)...")
+    wf_jobs = boards.discover_wellfound()
+    print(f"  {len(wf_jobs)} ofertas encontradas")
+    discovered.extend(wf_jobs)
 
 if not only_board or only_board == "glovo":
     print("\nGlovo Careers (careers.glovoapp.com)...")
