@@ -2,6 +2,7 @@
 
 Boards soportados:
 - getonbrd  : GetOnBrd LATAM  (getonbrd.com)  — API JSON + fallback HTML
+- remotive  : Remotive.io     (remotive.com)  — API JSON pública, global remote
 - glovo     : Glovo Careers   (careers.glovoapp.com) — Playwright
 """
 
@@ -159,6 +160,147 @@ def _getonbrd_html(remote_only: bool, max_pages: int) -> list[dict]:
             break
 
     return jobs
+
+
+# ---------------------------------------------------------------------------
+# Remotive.io
+# ---------------------------------------------------------------------------
+
+# Excluye jobs con location_required explícitamente restringida a países sin Ecuador
+_LOCATION_EXCLUDE = re.compile(
+    r"\b(USA|US only|United States|UK only|United Kingdom|Europe only|"
+    r"EU only|Canada only|Australia only|Brazil only|Mexico only|"
+    r"Argentina only|Colombia only|India only)\b",
+    re.I,
+)
+
+# Locations que confirman acceso desde Ecuador/LATAM
+_LOCATION_OK = re.compile(
+    r"\b(Worldwide|Anywhere|Global|LATAM|Latin America|South America|"
+    r"Remote|Americas|International)\b",
+    re.I,
+)
+
+
+def discover_remotive(category: str = "software-dev") -> list[dict]:
+    """Descubre ofertas en remotive.com via API pública (sin auth).
+
+    NOTA 2026-06-07: Remotive limitó su API gratuita a ~28 jobs fijos.
+    Mantenida como fallback por si amplían el tier gratuito.
+    """
+    try:
+        r = httpx.get(
+            "https://remotive.com/api/remote-jobs",
+            params={"category": category, "limit": 100},
+            headers={**_HEADERS, "Accept": "application/json"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        jobs = []
+        for item in r.json().get("jobs", []):
+            jobs.append({
+                "title": item.get("title", ""),
+                "company": item.get("company_name", ""),
+                "url": item.get("url", ""),
+                "remote": True,
+                "source": "remotive",
+                "description": item.get("description", ""),
+                "location_required": item.get("candidate_required_location", "Worldwide"),
+            })
+        return jobs
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# RemoteOK
+# ---------------------------------------------------------------------------
+
+# Tags tech a consultar en RemoteOK (cada tag = 1 llamada API, se deduplica)
+_REMOTEOK_TAGS = ["python", "react", "backend", "javascript", "mobile"]
+
+# Excluye jobs cuya location es claramente país específico sin Ecuador
+_REMOTEOK_LOC_EXCLUDE = re.compile(
+    r"\b(United States|United Kingdom|Australia|Germany|France|"
+    r"India|Brazil|Poland|Ukraine|Israel)\b",
+    re.I,
+)
+
+
+def discover_remoteok() -> list[dict]:
+    """Descubre ofertas en remoteok.com via API JSON pública (sin auth).
+
+    Hace una llamada por tag tech, deduplica por slug, retorna jobs únicos.
+    Location vacía = accesible desde cualquier país.
+    """
+    seen: set[str] = set()
+    jobs: list[dict] = []
+
+    for tag in _REMOTEOK_TAGS:
+        try:
+            r = httpx.get(
+                f"https://remoteok.com/api?tag={tag}",
+                headers={**_HEADERS, "User-Agent": _HEADERS["User-Agent"]},
+                timeout=15,
+            )
+            if r.status_code != 200:
+                continue
+            for item in r.json():
+                if not isinstance(item, dict) or not item.get("slug"):
+                    continue
+                slug = item["slug"]
+                if slug in seen:
+                    continue
+                seen.add(slug)
+                location = item.get("location", "") or ""
+                jobs.append({
+                    "title": item.get("position", ""),
+                    "company": item.get("company", ""),
+                    "url": item.get("url", f"https://remoteok.com/remote-jobs/{slug}"),
+                    "remote": True,
+                    "source": "remoteok",
+                    "description": item.get("description", ""),
+                    "location_required": location,
+                    "tags": item.get("tags", []),
+                })
+        except Exception:
+            continue
+
+    # Deduplicar por (title, company) para evitar doble-posteo de misma posición
+    final: list[dict] = []
+    seen_tc: set[tuple] = set()
+    for job in jobs:
+        key = (job["title"].lower().strip(), job["company"].lower().strip())
+        if key in seen_tc:
+            continue
+        seen_tc.add(key)
+        final.append(job)
+    return final
+
+
+def filter_global_remote(jobs: list[dict]) -> list[dict]:
+    """Filtra jobs por accesibilidad desde Ecuador.
+
+    - Sin location_required → pasa (ej. GetOnBrd nativo, RemoteOK sin ciudad)
+    - Worldwide/Anywhere/LATAM/Global/Americas → pasa
+    - USA only / UK only / etc. → excluye
+    - Ambiguo (North America, Europe, ciudad) → pasa con flag location_warning
+    """
+    result = []
+    for job in jobs:
+        loc = job.get("location_required", "") or ""
+        if not loc.strip():
+            result.append(job)
+            continue
+        if _LOCATION_OK.search(loc):
+            result.append(job)
+            continue
+        if _LOCATION_EXCLUDE.search(loc) or _REMOTEOK_LOC_EXCLUDE.search(loc):
+            continue
+        # Ambiguo → incluir con advertencia visible al usuario
+        job["location_warning"] = loc
+        result.append(job)
+    return result
 
 
 # ---------------------------------------------------------------------------

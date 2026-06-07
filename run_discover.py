@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""Descubre ofertas nuevas desde tableros, matchea, genera cartas y postula.
+"""Descubre ofertas nuevas desde tableros, matchea, genera cartas.
 
 Boards:
-  - GetOnBrd (getonbrd.com) — ofertas remotas tech en LATAM
-  - Glovo Careers (careers.glovoapp.com) — ofertas tech de Glovo
+  - GetOnBrd  (getonbrd.com)   — ofertas remotas tech en LATAM
+  - RemoteOK  (remoteok.com)   — 250+ jobs remotos globales, API pública
+  - Remotive  (remotive.com)   — API pública (actualmente limitada a ~28 jobs)
+  - Glovo Careers              — ofertas tech de Glovo
 
 Filtros aplicados automaticamente:
   1. Solo keywords técnicas (python, backend, fullstack, react, etc.)
   2. Sin senior/lead/architect en el título
   3. Sin "3+ años de experiencia" en la descripción
+  4. [RemoteOK/Remotive] Sin restricción de país que excluya Ecuador
 
 Uso:
-  python run_discover.py              # descubrir + aplicar (modo real)
-  python run_discover.py --dry-run    # descubrir + llenar formularios pero NO enviar
-  python run_discover.py --no-apply   # solo generar cartas, sin postular
+  python run_discover.py              # todos los boards + genera cartas
+  python run_discover.py --no-apply   # igual (modo default, sin auto-apply)
   python run_discover.py getonbrd     # solo GetOnBrd
+  python run_discover.py remoteok     # solo RemoteOK
+  python run_discover.py remotive     # solo Remotive
   python run_discover.py glovo        # solo Glovo
   python run_discover.py --no-remote  # incluir presenciales
 """
@@ -36,7 +40,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 # Argumentos
 args = sys.argv[1:]
-only_board  = next((a for a in args if a in ("getonbrd", "glovo")), None)
+only_board  = next((a for a in args if a in ("getonbrd", "remotive", "remoteok", "glovo")), None)
 remote_only = "--no-remote" not in args
 dry_run     = "--dry-run" in args
 no_apply    = "--no-apply" in args
@@ -55,6 +59,20 @@ if not only_board or only_board == "getonbrd":
     gob_jobs = boards.discover_getonbrd(remote_only=remote_only, max_pages=3)
     print(f"  {len(gob_jobs)} ofertas encontradas")
     discovered.extend(gob_jobs)
+
+if not only_board or only_board == "remotive":
+    print("\nRemotive (remotive.com)...")
+    remotive_jobs = boards.discover_remotive()
+    remotive_global = boards.filter_global_remote(remotive_jobs)
+    print(f"  {len(remotive_jobs)} ofertas → {len(remotive_global)} con acceso global/LATAM")
+    discovered.extend(remotive_global)
+
+if not only_board or only_board == "remoteok":
+    print("\nRemoteOK (remoteok.com)...")
+    rok_jobs = boards.discover_remoteok()
+    rok_global = boards.filter_global_remote(rok_jobs)
+    print(f"  {len(rok_jobs)} ofertas → {len(rok_global)} sin restricción de país")
+    discovered.extend(rok_global)
 
 if not only_board or only_board == "glovo":
     print("\nGlovo Careers (careers.glovoapp.com)...")
@@ -95,6 +113,9 @@ for job in junior_jobs:
     print("=" * 64)
     print(f"[{job['source'].upper():10}] {job['title']}")
     print(f"  URL: {job['url']}")
+    if job.get("location_required"):
+        loc_warn = " [!]" if job.get("location_warning") else ""
+        print(f"  Ubicacion: {job['location_required']}{loc_warn}")
 
     # Scrapear descripcion completa si la API no la trajo
     if not job.get("description") or len(job["description"]) < 200:
@@ -257,8 +278,9 @@ for r in results:
     j = r["job"]
     remote_tag = "REMOTO" if j.get("remote") else "presencial"
     company    = str(j.get("company") or "?")
-    platform   = j.get("ats_platform", "—")
+    loc        = j.get("location_required", "")
+    loc_tag    = f" [{loc}]" if loc and loc.lower() not in ("worldwide", "") else ""
     print(
         f"  [{j['source']:10}] {company:20} "
-        f"{j['title'][:38]:38} {r['match']['score']}%  {remote_tag}  [{platform}]"
+        f"{j['title'][:38]:38} {r['match']['score']}%  {remote_tag}{loc_tag}"
     )

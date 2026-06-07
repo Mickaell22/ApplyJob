@@ -11,7 +11,7 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `src/matcher.py` — calcula % de compatibilidad oferta vs perfil
 - `src/cover.py` — genera carta personalizada con DeepSeek Flash (via Anthropic SDK)
 - `src/apply_ats.py` — auto-postulacion en ATS con Playwright; soporta Workable, Greenhouse, GetOnBrd (con sesion)
-- `src/boards.py` — descubre ofertas desde tableros: GetOnBrd (API JSON) y Glovo Careers; incluye filtros junior/entry-level
+- `src/boards.py` — descubre ofertas desde tableros: GetOnBrd (API JSON), RemoteOK (API JSON multi-tag), Remotive (API limitada), Glovo Careers; filtros junior/entry-level/global-remote
 - `src/letter_to_pdf.py` — convierte cartas .txt a PDF via python-docx + LibreOffice
 - `src/sender.py` — envia carta por Gmail SMTP
 - `src/inbox.py` — lector IMAP para boletines de ofertas
@@ -105,21 +105,26 @@ GETONBRD_SESSION_PATH=./.gob_session.json
 
 ## Discovery Pipeline (`run_discover.py`)
 
-Pipeline automatico de descubrimiento y postulacion:
+Pipeline de descubrimiento multi-board → filtrado → generacion de cartas. Postulacion MANUAL.
 
 ```bash
-.venv/bin/python3 run_discover.py              # descubre + aplica en real
-.venv/bin/python3 run_discover.py --dry-run    # llena formularios, NO envia
-.venv/bin/python3 run_discover.py --no-apply   # solo genera cartas
+.venv/bin/python3 run_discover.py --no-apply   # todos los boards (default)
 .venv/bin/python3 run_discover.py getonbrd     # solo GetOnBrd
+.venv/bin/python3 run_discover.py remoteok     # solo RemoteOK
 ```
 
-**Filtros en cascada:**
-1. Keywords tecnicas (python, backend, fullstack, react, etc.)
-2. Sin senior/lead/architect/ssr en titulo (`_SENIOR_EXCLUDE` regex)
-3. Sin "3+ años de experiencia" en descripcion (`_EXP_EXCLUDE` regex)
+**Boards activos:**
+- GetOnBrd — ~48 candidatos/corrida (LATAM, API JSON, remoto real)
+- RemoteOK — ~53 candidatos/corrida (global, API JSON, tags tech)
+- Total tipico: ~101 candidatos antes de match
 
-**Resultado tipico:** 150 ofertas GetOnBrd → ~80 sin senior → ~26 cartas generadas
+**Filtros en cascada:**
+1. Keywords tecnicas en titulo (`TECH_FILTER`)
+2. Sin senior/lead/architect/ssr en titulo (`_SENIOR_EXCLUDE`)
+3. Sin "3+ años de experiencia" en descripcion (`_EXP_EXCLUDE`)
+4. [RemoteOK] Sin restriccion de pais que excluya Ecuador (`filter_global_remote`)
+
+**Jobs con [!] en location:** son ambiguos (ciudad en vez de pais) — revisarlos antes de postular.
 
 **GetOnBrd session setup (una vez):**
 ```bash
@@ -130,15 +135,18 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 
 ## `src/boards.py` — Board Scrapers
 
-- `discover_getonbrd(remote_only, max_pages)` — API JSON de getonbrd (`/api/v0/categories/programming/jobs`); formato JSON:API; URL en `item["links"]["public_url"]`; descripcion en `attrs["description"]` (HTML)
-- `discover_glovo(tech_only)` — Playwright en `careers.glovoapp.com` (actualmente 0 resultados, pendiente fix)
+- `discover_getonbrd(remote_only, max_pages)` — API JSON (`/api/v0/categories/programming/jobs`); excluye IDs seniority 4=Senior y 5=Lead
+- `discover_remoteok()` — API JSON pública; llama con tags [python, react, backend, javascript, mobile]; deduplica por slug y (title, company)
+- `discover_remotive()` — API JSON (actualmente limitada a ~28 jobs fijos en tier free)
+- `discover_glovo(tech_only)` — Playwright en careers.glovoapp.com (0 resultados, pendiente fix)
 - `filter_tech(jobs)` — keywords tecnicas en titulo
 - `filter_junior(jobs)` — excluye senior/lead/ssr/etc en titulo
 - `filter_entry_level(jobs)` — excluye si descripcion pide 3+ años
+- `filter_global_remote(jobs)` — excluye country-restricted (USA/UK/etc); agrega `location_warning` a los ambiguos
 - `getonbrd_apply_url(url)` — retorna `{url}/applications/new`
-- `resolve_apply_url(url)` — intenta encontrar URL ATS externa via Playwright (mayoría de GetOnBrd es nativo, no externo)
+- `resolve_apply_url(url)` — encuentra URL ATS externa via Playwright
 
-## Current State (2026-06-06)
+## Current State (2026-06-07)
 
 - CV bilingüe completo: `profile/cv.md` (ES) + `profile/cv_en.md` (EN) + PDFs en ambos idiomas.
 - `cover.generate` soporta `lang="es"/"en"`. `apply_ats.run()` soporta `lang="en"` para subir CV EN.
@@ -149,11 +157,14 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `profile/postulaciones.md` — tracker de postulaciones enviadas (gitignored).
 - Decision de flujo (2026-06-06): `run_discover.py --no-apply` para filtrar y generar cartas; postulaciones se envian MANUALMENTE desde GetOnBoard. No usar auto-apply para envios reales.
 - Restriccion del candidato: SOLO remoto-real (estudiante en Guayaquil, sin reubicacion).
-- Postulaciones enviadas hoy (2026-06-06): #5 BC Tecnologia Jr, #6 Designcafe Full-Stack Web Developer, #7 BC Tecnologia Full-Stack remote, #8 BC Tecnologia Full-Stack con IA. Total: 8 postulaciones (4 Canonical rechazadas).
+- Postulaciones enviadas (2026-06-07): #9 Idealista Frontend Developer React (LinkedIn), #10 EasyAudit AI Inc Full-Stack Developer (GetOnBoard). Total: 10 postulaciones (4 Canonical rechazadas).
+- Leccion boletin JuniorJobs (2026-06-07): ofertas España/EU requieren autorizacion de trabajo local → no aplican desde Ecuador. Ofertas LATAM "100% remoto" suelen ser por pais especifico (Argentina, Brasil, Colombia, Mexico). Solo sirven las truly global remote (sin bandera de pais) o GetOnBoard.
 - Fixes en `run_discover.py` + `src/boards.py` (2026-06-06): colision de nombres de archivos resuelta (slug desde URL), filtro seniority via API (IDs 4=Senior y 5=Lead excluidos), "intermedio" y "mid-level" añadidos a `_SENIOR_EXCLUDE`.
 - Patron detectado en GetOnBoard: jobs con "santiago" en URL suelen ser hibridos; jobs con "remote" en URL son realmente remotos. Muchos jobs son semi-senior (ID 3) aunque el candidato aplique igual.
 - `output/designcafe_form_answers.txt` — respuestas reutilizables para formularios GetOnBoard (GITIGNORED).
-- To-do: arreglar scraper Glovo (0 resultados); explorar otros boards (LinkedIn, Workana) para mas ofertas junior reales.
+- `output/easyaudit_form_answers.txt` — respuestas + cover letter EN para EasyAudit AI (GITIGNORED).
+- boards/discovery ampliado (2026-06-07): RemoteOK implementado via API JSON multi-tag; ~101 candidatos/corrida (GetOnBrd + RemoteOK). Remotive API limitada a 28 jobs fijos (tier free), Torre.co requiere auth → ambos descartados por ahora.
+- To-do: explorar LinkedIn Jobs (requiere auth) para mayor volumen.
 
 ## Common Issues
 
