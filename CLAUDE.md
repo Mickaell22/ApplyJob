@@ -11,7 +11,7 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `src/matcher.py` — calcula % de compatibilidad oferta vs perfil
 - `src/cover.py` — genera carta personalizada con DeepSeek Flash (via Anthropic SDK)
 - `src/apply_ats.py` — auto-postulacion en ATS con Playwright; soporta Workable, Greenhouse, GetOnBrd (con sesion)
-- `src/boards.py` — descubre ofertas desde tableros: GetOnBrd (API JSON), RemoteOK (API JSON multi-tag), Remotive (API limitada), Glovo Careers; filtros junior/entry-level/global-remote
+- `src/boards.py` — descubre ofertas desde tableros: GetOnBrd (API JSON), Himalayas (API JSON, worldwide, filtro Entry-level), Remotive (API limitada), Glovo Careers; filtros junior/entry-level/global-remote
 - `src/letter_to_pdf.py` — convierte cartas .txt a PDF via python-docx + LibreOffice
 - `src/sender.py` — envia carta por Gmail SMTP
 - `src/inbox.py` — lector IMAP para boletines de ofertas
@@ -110,19 +110,19 @@ Pipeline de descubrimiento multi-board → filtrado → generacion de cartas. Po
 ```bash
 .venv/bin/python3 run_discover.py --no-apply   # todos los boards (default)
 .venv/bin/python3 run_discover.py getonbrd     # solo GetOnBrd
-.venv/bin/python3 run_discover.py remoteok     # solo RemoteOK
+.venv/bin/python3 run_discover.py himalayas    # solo Himalayas
 ```
 
 **Boards activos:**
-- GetOnBrd — ~48 candidatos/corrida (LATAM, API JSON, remoto real)
-- RemoteOK — ~53 candidatos/corrida (global, API JSON, tags tech)
-- Total tipico: ~101 candidatos antes de match
+- GetOnBrd — ~18 cartas/corrida (LATAM, API JSON, remoto real)
+- Himalayas — ~11 cartas/corrida (global worldwide, API JSON, filtro Entry+Mid-level nativo)
+- Total tipico: ~29 cartas/corrida
 
 **Filtros en cascada:**
 1. Keywords tecnicas en titulo (`TECH_FILTER`)
 2. Sin senior/lead/architect/ssr en titulo (`_SENIOR_EXCLUDE`)
 3. Sin "3+ años de experiencia" en descripcion (`_EXP_EXCLUDE`)
-4. [RemoteOK] Sin restriccion de pais que excluya Ecuador (`filter_global_remote`)
+4. [Himalayas] `worldwide=true` en API + exclusion por URL de país (`_HIMALAYAS_URL_COUNTRY`)
 
 **Jobs con [!] en location:** son ambiguos (ciudad en vez de pais) — revisarlos antes de postular.
 
@@ -136,7 +136,8 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 ## `src/boards.py` — Board Scrapers
 
 - `discover_getonbrd(remote_only, max_pages)` — API JSON (`/api/v0/categories/programming/jobs`); excluye IDs seniority 4=Senior y 5=Lead
-- `discover_remoteok()` — API JSON pública; llama con tags [python, react, backend, javascript, mobile]; deduplica por slug y (title, company)
+- `discover_himalayas()` — API JSON pública (`/jobs/api?worldwide=true`); paginado, filtra Entry+Mid-level por seniority field, excluye país en URL; headers mínimos (sin Accept-Language → Cloudflare 403)
+- `filter_himalayas_location(jobs)` — passthrough (worldwide=true ya filtra en API)
 - `discover_remotive()` — API JSON (actualmente limitada a ~28 jobs fijos en tier free)
 - `discover_glovo(tech_only)` — Playwright en careers.glovoapp.com (0 resultados, pendiente fix)
 - `filter_tech(jobs)` — keywords tecnicas en titulo
@@ -155,16 +156,15 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - Canonical x4 rechazadas (2026-06-03): Graduate Software Engineer / Software Engineer Python Cloud / Junior Software Developer Observability / Junior Ubuntu Software Engineer. Todas filtradas en primera ronda automatica. Reaplicar en 6 meses.
 - `profile/getonboard_bio.txt` — textos del perfil GetOnBoard en ES+EN (gitignored).
 - `profile/postulaciones.md` — tracker de postulaciones enviadas (gitignored).
-- Decision de flujo (2026-06-06): `run_discover.py --no-apply` para filtrar y generar cartas; postulaciones se envian MANUALMENTE desde GetOnBoard. No usar auto-apply para envios reales.
+- Decision de flujo (2026-06-06): `run_discover.py --no-apply` para filtrar y generar cartas; postulaciones se envian MANUALMENTE. No usar auto-apply para envios reales.
 - Restriccion del candidato: SOLO remoto-real (estudiante en Guayaquil, sin reubicacion).
-- Postulaciones enviadas (2026-06-07): #9 Idealista Frontend Developer React (LinkedIn), #10 EasyAudit AI Inc Full-Stack Developer (GetOnBoard). Total: 10 postulaciones (4 Canonical rechazadas).
-- Leccion boletin JuniorJobs (2026-06-07): ofertas España/EU requieren autorizacion de trabajo local → no aplican desde Ecuador. Ofertas LATAM "100% remoto" suelen ser por pais especifico (Argentina, Brasil, Colombia, Mexico). Solo sirven las truly global remote (sin bandera de pais) o GetOnBoard.
-- Fixes en `run_discover.py` + `src/boards.py` (2026-06-06): colision de nombres de archivos resuelta (slug desde URL), filtro seniority via API (IDs 4=Senior y 5=Lead excluidos), "intermedio" y "mid-level" añadidos a `_SENIOR_EXCLUDE`.
-- Patron detectado en GetOnBoard: jobs con "santiago" en URL suelen ser hibridos; jobs con "remote" en URL son realmente remotos. Muchos jobs son semi-senior (ID 3) aunque el candidato aplique igual.
-- `output/designcafe_form_answers.txt` — respuestas reutilizables para formularios GetOnBoard (GITIGNORED).
-- `output/easyaudit_form_answers.txt` — respuestas + cover letter EN para EasyAudit AI (GITIGNORED).
-- boards/discovery ampliado (2026-06-07): RemoteOK implementado via API JSON multi-tag; ~101 candidatos/corrida (GetOnBrd + RemoteOK). Remotive API limitada a 28 jobs fijos (tier free), Torre.co requiere auth → ambos descartados por ahora.
-- To-do: explorar LinkedIn Jobs (requiere auth) para mayor volumen.
+- Postulaciones enviadas al 2026-06-07: 14 total (4 Canonical rechazadas, 10 activas). Las 3 de Bluelight Consulting via Himalayas recibieron confirmacion inmediata via Lever.
+- RemoteOK descartado (2026-06-07): implementado pero tiene paywall para candidatos (suscripcion mensual requerida para ver el apply URL). Reemplazado por Himalayas.
+- Himalayas implementado (2026-06-07): API `/jobs/api?worldwide=true`, paginado, filtro Entry+Mid-level. ~11 cartas/corrida. Headers minimos (sin Accept-Language para evitar CF 403). URL-country filter para limpiar falsos "worldwide".
+- Matcher threshold bajado (2026-06-07): baja de 20% a 8% — descripciones narrativas de Himalayas mencionan pocas keywords; 2 techs matcheadas ya indica relevancia.
+- `clean_letters.py` — archiva cartas del dia en `output/cartas/archive/YYYY-MM-DD/`. Correr cada noche.
+- Boards descartados: RemoteOK (paywall candidatos), Wellfound (DataDome+CF, scraping inviable), Jobicy (401), Torre.co (401), Arbeitnow (aleman). Remotive limitada a 28 jobs fijos.
+- Patron Himalayas: muchos jobs "worldwide" tienen pais en la URL (chile, colombia, usa, etc.) — filtro `_HIMALAYAS_URL_COUNTRY` los excluye. Bluelight Consulting LATAM acepta Ecuador confirmado.
 
 ## Common Issues
 

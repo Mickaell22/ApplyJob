@@ -28,7 +28,7 @@ def score(job: dict, profile: dict) -> dict:
     return {
         "score": score,
         "matched_techs": matched,
-        "fit": "alta" if score >= 40 else "media" if score >= 20 else "baja",
+        "fit": "alta" if score >= 40 else "media" if score >= 8 else "baja",
     }
 
 

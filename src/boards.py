@@ -1,8 +1,9 @@
 """Descubre ofertas laborales desde tableros de trabajo.
 
 Boards soportados:
-- getonbrd  : GetOnBrd LATAM  (getonbrd.com)  — API JSON + fallback HTML
-- remotive  : Remotive.io     (remotive.com)  — API JSON pública, global remote
+- getonbrd  : GetOnBrd LATAM  (getonbrd.com)     — API JSON + fallback HTML
+- himalayas : Himalayas.app   (himalayas.app)    — API JSON pública, global remote, filtro Entry-level
+- remotive  : Remotive.io     (remotive.com)     — API JSON pública, global remote
 - glovo     : Glovo Careers   (careers.glovoapp.com) — Playwright
 """
 
@@ -213,69 +214,123 @@ def discover_remotive(category: str = "software-dev") -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# RemoteOK
+# Himalayas.app
 # ---------------------------------------------------------------------------
 
-# Tags tech a consultar en RemoteOK (cada tag = 1 llamada API, se deduplica)
-_REMOTEOK_TAGS = ["python", "react", "backend", "javascript", "mobile"]
+_HIMALAYAS_QUERIES = ["python", "react", "fullstack", "backend", "javascript", "developer"]
 
-# Excluye jobs cuya location es claramente país específico sin Ecuador
-_REMOTEOK_LOC_EXCLUDE = re.compile(
-    r"\b(United States|United Kingdom|Australia|Germany|France|"
-    r"India|Brazil|Poland|Ukraine|Israel)\b",
+# Himalayas bloquea Accept-Language; usar solo User-Agent + Accept
+_HIMALAYAS_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+    "Accept": "application/json",
+}
+
+# Países/regiones que excluyen Ecuador en Himalayas locationRestrictions
+_HIMALAYAS_LOC_EXCLUDE = re.compile(
+    r"\b(United States|United Kingdom|Canada|Australia|Germany|France|"
+    r"India|Brazil|Poland|Ukraine|Israel|Europe|European Union|"
+    r"Mexico|Argentina|Colombia|China|Japan)\b",
+    re.I,
+)
+
+_HIMALAYAS_LOC_OK = re.compile(
+    r"\b(Worldwide|Anywhere|Global|LATAM|Latin America|South America|"
+    r"Remote|Americas|International)\b",
+    re.I,
+)
+
+# Detecta país/ciudad en la URL del job (cuando worldwide=true falla)
+_HIMALAYAS_URL_COUNTRY = re.compile(
+    r"-(india|usa|canada|australia|brazil|united-kingdom|uk|gb|germany|"
+    r"france|poland|ukraine|israel|china|japan|"
+    r"chile|colombia|mexico|argentina|peru|"
+    r"san-jose|new-york|london|berlin|sydney|toronto|"
+    r"south-east-us|north-america)(?:-|$)",
     re.I,
 )
 
 
-def discover_remoteok() -> list[dict]:
-    """Descubre ofertas en remoteok.com via API JSON pública (sin auth).
+def discover_himalayas() -> list[dict]:
+    """Descubre ofertas en himalayas.app via API pública (sin auth).
 
-    Hace una llamada por tag tech, deduplica por slug, retorna jobs únicos.
-    Location vacía = accesible desde cualquier país.
+    Usa el browse endpoint con worldwide=true para obtener todos los jobs
+    sin restricción de país. Filtra Entry-level + Mid-level por seniority field.
+    applicationLink = URL gratuita del job en Himalayas para el candidato.
     """
     seen: set[str] = set()
     jobs: list[dict] = []
 
-    for tag in _REMOTEOK_TAGS:
+    for offset in range(0, 220, 20):
         try:
             r = httpx.get(
-                f"https://remoteok.com/api?tag={tag}",
-                headers={**_HEADERS, "User-Agent": _HEADERS["User-Agent"]},
+                "https://himalayas.app/jobs/api",
+                params={"limit": 20, "worldwide": "true", "offset": offset},
+                headers=_HIMALAYAS_HEADERS,
                 timeout=15,
             )
             if r.status_code != 200:
-                continue
-            for item in r.json():
-                if not isinstance(item, dict) or not item.get("slug"):
+                break
+            items = r.json().get("jobs", [])
+            if not items:
+                break
+            for item in items:
+                guid = item.get("guid", "")
+                if not guid or guid in seen:
                     continue
-                slug = item["slug"]
-                if slug in seen:
+
+                # Solo Entry-level y Mid-level (excluye Senior/Director/Manager)
+                seniority = item.get("seniority") or []
+                if seniority and not any(
+                    s in ("Entry-level", "Mid-level") for s in seniority
+                ):
                     continue
-                seen.add(slug)
-                location = item.get("location", "") or ""
+
+                # Excluir si la URL del job contiene país/ciudad específico
+                apply_url = item.get("applicationLink", "")
+                if _HIMALAYAS_URL_COUNTRY.search(apply_url):
+                    continue
+
+                seen.add(guid)
                 jobs.append({
-                    "title": item.get("position", ""),
-                    "company": item.get("company", ""),
-                    "url": item.get("url", f"https://remoteok.com/remote-jobs/{slug}"),
+                    "title": item.get("title", ""),
+                    "company": item.get("companyName", ""),
+                    "url": apply_url,
                     "remote": True,
-                    "source": "remoteok",
+                    "source": "himalayas",
                     "description": item.get("description", ""),
-                    "location_required": location,
-                    "tags": item.get("tags", []),
+                    "location_required": "",  # worldwide=true → sin restricción
                 })
         except Exception:
-            continue
+            break
 
-    # Deduplicar por (title, company) para evitar doble-posteo de misma posición
-    final: list[dict] = []
-    seen_tc: set[tuple] = set()
+    return jobs
+
+
+def filter_himalayas_location(jobs: list[dict]) -> list[dict]:
+    """Filtra jobs de Himalayas por accesibilidad desde Ecuador.
+
+    - Sin locationRestrictions → pasa
+    - Worldwide/LATAM/Global → pasa
+    - País específico sin Ecuador → excluye
+    - Ambiguo → pasa con location_warning
+    """
+    result = []
     for job in jobs:
-        key = (job["title"].lower().strip(), job["company"].lower().strip())
-        if key in seen_tc:
+        if job.get("source") != "himalayas":
+            result.append(job)
             continue
-        seen_tc.add(key)
-        final.append(job)
-    return final
+        loc = job.get("location_required", "") or ""
+        if not loc.strip():
+            result.append(job)
+            continue
+        if _HIMALAYAS_LOC_OK.search(loc):
+            result.append(job)
+            continue
+        if _HIMALAYAS_LOC_EXCLUDE.search(loc):
+            continue
+        job["location_warning"] = loc
+        result.append(job)
+    return result
 
 
 def filter_global_remote(jobs: list[dict]) -> list[dict]:

@@ -3,7 +3,7 @@
 
 Boards:
   - GetOnBrd  (getonbrd.com)   — ofertas remotas tech en LATAM
-  - RemoteOK  (remoteok.com)   — 250+ jobs remotos globales, API pública
+  - Himalayas (himalayas.app)  — API pública global, filtro Entry-level nativo
   - Remotive  (remotive.com)   — API pública (actualmente limitada a ~28 jobs)
   - Glovo Careers              — ofertas tech de Glovo
 
@@ -11,13 +11,13 @@ Filtros aplicados automaticamente:
   1. Solo keywords técnicas (python, backend, fullstack, react, etc.)
   2. Sin senior/lead/architect en el título
   3. Sin "3+ años de experiencia" en la descripción
-  4. [RemoteOK/Remotive] Sin restricción de país que excluya Ecuador
+  4. [Himalayas/Remotive] Sin restricción de país que excluya Ecuador
 
 Uso:
   python run_discover.py              # todos los boards + genera cartas
   python run_discover.py --no-apply   # igual (modo default, sin auto-apply)
   python run_discover.py getonbrd     # solo GetOnBrd
-  python run_discover.py remoteok     # solo RemoteOK
+  python run_discover.py himalayas    # solo Himalayas
   python run_discover.py remotive     # solo Remotive
   python run_discover.py glovo        # solo Glovo
   python run_discover.py --no-remote  # incluir presenciales
@@ -40,7 +40,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 # Argumentos
 args = sys.argv[1:]
-only_board  = next((a for a in args if a in ("getonbrd", "remotive", "remoteok", "glovo")), None)
+only_board  = next((a for a in args if a in ("getonbrd", "remotive", "himalayas", "glovo")), None)
 remote_only = "--no-remote" not in args
 dry_run     = "--dry-run" in args
 no_apply    = "--no-apply" in args
@@ -60,19 +60,19 @@ if not only_board or only_board == "getonbrd":
     print(f"  {len(gob_jobs)} ofertas encontradas")
     discovered.extend(gob_jobs)
 
+if not only_board or only_board == "himalayas":
+    print("\nHimalayas (himalayas.app)...")
+    him_jobs = boards.discover_himalayas()
+    him_global = boards.filter_himalayas_location(him_jobs)
+    print(f"  {len(him_jobs)} ofertas → {len(him_global)} sin restricción de país")
+    discovered.extend(him_global)
+
 if not only_board or only_board == "remotive":
     print("\nRemotive (remotive.com)...")
     remotive_jobs = boards.discover_remotive()
     remotive_global = boards.filter_global_remote(remotive_jobs)
     print(f"  {len(remotive_jobs)} ofertas → {len(remotive_global)} con acceso global/LATAM")
     discovered.extend(remotive_global)
-
-if not only_board or only_board == "remoteok":
-    print("\nRemoteOK (remoteok.com)...")
-    rok_jobs = boards.discover_remoteok()
-    rok_global = boards.filter_global_remote(rok_jobs)
-    print(f"  {len(rok_jobs)} ofertas → {len(rok_global)} sin restricción de país")
-    discovered.extend(rok_global)
 
 if not only_board or only_board == "glovo":
     print("\nGlovo Careers (careers.glovoapp.com)...")
