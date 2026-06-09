@@ -160,7 +160,7 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `getonbrd_apply_url(url)` — retorna `{url}/applications/new`
 - `resolve_apply_url(url)` — encuentra URL ATS externa via Playwright
 
-## Current State (2026-06-07)
+## Current State (2026-06-09)
 
 - CV bilingüe completo: `profile/cv.md` (ES) + `profile/cv_en.md` (EN) + PDFs en ambos idiomas.
 - `cover.generate` soporta `lang="es"/"en"`. `apply_ats.run()` soporta `lang="en"` para subir CV EN.
@@ -171,7 +171,7 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `profile/postulaciones.md` — tracker de postulaciones enviadas (gitignored).
 - Decision de flujo (2026-06-06): `run_discover.py --no-apply` para filtrar y generar cartas; postulaciones se envian MANUALMENTE. No usar auto-apply para envios reales.
 - Restriccion del candidato: SOLO remoto-real (estudiante en Guayaquil, sin reubicacion).
-- Postulaciones enviadas al 2026-06-07: 14 total (4 Canonical rechazadas, 10 activas). Las 3 de Bluelight Consulting via Himalayas recibieron confirmacion inmediata via Lever.
+- Postulaciones enviadas al 2026-06-09: 17 total (4 Canonical rechazadas, 13 activas). Las 3 de Bluelight Consulting via Himalayas recibieron confirmacion inmediata via Lever. Tritone Analytics tambien via GetOnBoard.
 - `clean_letters.py` — archiva cartas del dia en `output/cartas/archive/YYYY-MM-DD/`. Correr cada noche.
 - Boards descartados: RemoteOK (paywall candidatos), Wellfound (DataDome+CF, scraping inviable + pocos resultados Ecuador), Jobicy (401), Torre.co (401), Arbeitnow (aleman), Remotive (28 jobs fijos), Jobgether (403), Authentic Jobs (RSS vacio), YC Work at a Startup (sin API publica).
 - Patron Himalayas: muchos jobs "worldwide" tienen pais en la URL — filtro `_HIMALAYAS_URL_COUNTRY` los excluye.
@@ -179,6 +179,11 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `run_batch.py` reescrito (2026-06-07): parsea boletin JuniorJobs (canal Telegram dominical), detecta banderas de pais, extrae empresa+titulo, corre mismo pipeline que run_discover.py. Usar cada domingo con el texto del boletin.
 - `_LOCATION_OK` regex: NO incluir "Remote" suelto — "Japan - Remote" lo matchea como falso positivo. Solo Worldwide/Anywhere/Global/Americas/LATAM/International.
 - `filter_global_remote` bug corregido (2026-06-07): referencia a `_REMOTEOK_LOC_EXCLUDE` inexistente eliminada.
+- Portafolio actualizado (2026-06-08): 5 proyectos nuevos en ES+EN — MotoVox (Flutter+C+WebRTC+FFI), Flores Eternas (Node.js+SRI Ecuador), Taller App (Node.js+React freelance), ApplyJob (Python+Playwright+AI), QR Shield (Python+Chrome Extension). GitHub links agregados a Centro Tia Glenda, EcuaInventario y Facturador.
+- CV React (`lib/cv/content.ts`) actualizado (2026-06-08): bullet Flores Eternas en Freelance + MotoVox como 5to proyecto. PDFs ES/EN regenerados.
+- GitHub limpiado (2026-06-08): READMEs y About descriptions en todos los repos publicos. TIER 1: TiaGlenda (prod), EcuaInventario, Facturador, SimuladorExamenes. TIER 2: MotoVox, TallerApp. TIER 3: qr-shield, mcp-context-server (3★), ApplyJob.
+- Output files (gitignored): `output/sezzle_latam_answers.txt`, `output/monterail_pick_one_tool.txt`, `output/tritone_why.txt`, `output/tritone_why_en.txt`, `output/getonbrd_perfil_actualizado.txt`, `output/getonbrd_perfil_actualizado_en.txt`.
+- Observacion del pipeline (2026-06-09): de 256 cartas generadas, la mayoria son senior/geo-restringidas (India, UK, US, LATAM especifico sin Ecuador). Los validos aplicados: Bluelight x3, Sezzle, Monterail, Tritone, EasyAudit AI, BC Tecnologia x3, Idealista, Designcafe. Pattern: Remote First Jobs genera muchos falsos positivos de seniority; revisar individualmente antes de postular.
 
 ## Common Issues
 
