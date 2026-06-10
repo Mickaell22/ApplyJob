@@ -44,6 +44,26 @@ from src.scraper import fetch_job
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "cartas")
 os.makedirs(OUT_DIR, exist_ok=True)
 
+# URLs ya postuladas — se saltan para no duplicar
+_APPLIED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "applied_urls.txt")
+
+def _load_applied_urls() -> set:
+    if not os.path.exists(_APPLIED_FILE):
+        return set()
+    urls = set()
+    with open(_APPLIED_FILE, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                urls.add(line)
+    return urls
+
+def _mark_applied(url: str):
+    with open(_APPLIED_FILE, "a", encoding="utf-8") as f:
+        f.write(url + "\n")
+
+applied_urls = _load_applied_urls()
+
 # Argumentos
 args = sys.argv[1:]
 only_board  = next((a for a in args if a in (
@@ -160,6 +180,11 @@ for job in junior_jobs:
         loc_warn = " [!]" if job.get("location_warning") else ""
         print(f"  Ubicacion: {job['location_required']}{loc_warn}")
 
+    # Saltar si ya fue postulada
+    if job["url"] in applied_urls:
+        print("  [✓] Ya postulada — omitida")
+        continue
+
     # Scrapear descripcion completa si la API no la trajo
     if not job.get("description") or len(job["description"]) < 200:
         print("  Scrapeando descripcion...")
@@ -211,6 +236,8 @@ for job in junior_jobs:
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(carta)
     print(f"  Carta guardada: output/cartas/disc_{slug}.txt")
+    _mark_applied(job["url"])
+    applied_urls.add(job["url"])
 
     # Construir URL del formulario de aplicación
     if not no_apply and job["source"] == "getonbrd":

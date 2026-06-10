@@ -73,6 +73,7 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
     telefono = _extract(raw, r"\+?\d[\d\s()-]{7,}", "+593 98 377 7036")
     linkedin = _extract(raw, r"https?://(?:www\.)?linkedin\.com[^\s]+", "")
     github = _extract(raw, r"https?://(?:www\.)?github\.com[^\s]+", "")
+    portfolio = os.getenv("CANDIDATE_WEBSITE", "")
     ubicacion = "Guayaquil, Ecuador"
 
     unknown_note = _unknown_tech_note(job.get("description", ""), lang)
@@ -92,7 +93,8 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
         )
         closing = (
             "The letter must include: greeting, introduction, why the candidate fits the role, "
-            "relevant experience, and a cordial closing with the candidate's real contact details."
+            "relevant experience, and a cordial closing with the candidate's real contact details "
+            "including portfolio URL."
         )
     else:
         intro = (
@@ -110,7 +112,8 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
         )
         closing = (
             "La carta debe incluir: saludo, presentacion, porque encaja con el puesto, "
-            "experiencia relevante, cierre cordial con datos de contacto reales del candidato."
+            "experiencia relevante, cierre cordial con datos de contacto reales del candidato "
+            "incluyendo URL del portafolio."
         )
 
     resp = client.messages.create(
@@ -127,6 +130,7 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
                 f"**Telefono:** {telefono}\n"
                 f"**LinkedIn:** {linkedin}\n"
                 f"**GitHub:** {github}\n"
+                f"**Portfolio:** {portfolio}\n"
                 f"**Ubicacion:** {ubicacion}\n"
                 f"**Perfil completo:** {raw}\n\n"
                 + closing
