@@ -42,6 +42,38 @@ REMOTE_FILTER = re.compile(
     r"\b(remoto|remote|100%\s*remoto?|distributed|global)\b", re.I
 )
 
+# ---------------------------------------------------------------------------
+# Geo filters — configurables via CANDIDATE_REGION en .env
+# Opciones: LATAM (default), EUROPE, ASIA, USA, GLOBAL
+# ---------------------------------------------------------------------------
+
+_CANDIDATE_REGION = os.getenv("CANDIDATE_REGION", "LATAM").strip().upper()
+
+_REGION_OK_TERMS = {
+    "LATAM":  ["LATAM", "Latin America", "South America", "Americas", "not in the US", "not US"],
+    "EUROPE": ["Europe", "European Union", "EU", "EMEA"],
+    "ASIA":   ["Asia", "APAC", "Asia Pacific"],
+    "USA":    ["United States", "North America", "Americas"],
+    "GLOBAL": [],
+}
+_REGION_EXCL_TERMS = {
+    "LATAM":  ["USA", "US only", "United States", "UK only", "United Kingdom",
+               "Europe only", "EU only", "Canada only", "Australia only",
+               "Brazil only", "Mexico only", "Argentina only", "Colombia only", "India only"],
+    "EUROPE": ["USA", "US only", "United States", "LATAM only", "Latin America only",
+               "India only", "Australia only"],
+    "ASIA":   ["USA", "US only", "United States", "Europe only", "EU only",
+               "LATAM only", "Latin America only"],
+    "USA":    ["Europe only", "EU only", "LATAM only", "India only", "Australia only"],
+    "GLOBAL": [],
+}
+
+_ok_terms   = ["Worldwide", "Anywhere", "Global", "International"] + _REGION_OK_TERMS.get(_CANDIDATE_REGION, _REGION_OK_TERMS["LATAM"])
+_excl_terms = _REGION_EXCL_TERMS.get(_CANDIDATE_REGION, _REGION_EXCL_TERMS["LATAM"])
+
+# NO incluir "Remote" suelto — "Japan - Remote" lo matchearía como falso positivo
+_LOCATION_OK      = re.compile(r"\b(" + "|".join(_ok_terms)   + r")\b", re.I)
+_LOCATION_EXCLUDE = re.compile(r"\b(" + "|".join(_excl_terms) + r")\b", re.I) if _excl_terms else re.compile(r"(?!x)")
 
 # ---------------------------------------------------------------------------
 # GetOnBrd
@@ -169,22 +201,7 @@ def _getonbrd_html(remote_only: bool, max_pages: int) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Remotive.io
 # ---------------------------------------------------------------------------
-
-# Excluye jobs con location_required explícitamente restringida a países sin Ecuador
-_LOCATION_EXCLUDE = re.compile(
-    r"\b(USA|US only|United States|UK only|United Kingdom|Europe only|"
-    r"EU only|Canada only|Australia only|Brazil only|Mexico only|"
-    r"Argentina only|Colombia only|India only)\b",
-    re.I,
-)
-
-# Locations que confirman acceso desde Ecuador/LATAM
-# NO incluir "Remote" suelto — "Japan - Remote" lo matchearía como falso positivo
-_LOCATION_OK = re.compile(
-    r"\b(Worldwide|Anywhere|Global|LATAM|Latin America|South America|"
-    r"Americas|International|not in the US|not US)\b",
-    re.I,
-)
+# _LOCATION_OK y _LOCATION_EXCLUDE definidos en el bloque de geo-filters arriba
 
 
 def discover_remotive(category: str = "software-dev") -> list[dict]:
@@ -464,19 +481,33 @@ _HIMALAYAS_HEADERS = {
     "Accept": "application/json",
 }
 
-# Países/regiones que excluyen Ecuador en Himalayas locationRestrictions
-_HIMALAYAS_LOC_EXCLUDE = re.compile(
-    r"\b(United States|United Kingdom|Canada|Australia|Germany|France|"
-    r"India|Brazil|Poland|Ukraine|Israel|Europe|European Union|"
-    r"Mexico|Argentina|Colombia|China|Japan)\b",
-    re.I,
-)
+# Himalayas usa nombres de país directos (sin "only") → patrones separados por región
+_HIMALAYAS_OK_TERMS = {
+    "LATAM":  ["Worldwide", "Anywhere", "Global", "LATAM", "Latin America",
+               "South America", "Remote", "Americas", "International"],
+    "EUROPE": ["Worldwide", "Anywhere", "Global", "Europe", "European Union",
+               "EU", "EMEA", "Remote", "International"],
+    "ASIA":   ["Worldwide", "Anywhere", "Global", "Asia", "APAC",
+               "Asia Pacific", "Remote", "International"],
+    "USA":    ["Worldwide", "Anywhere", "Global", "United States",
+               "North America", "Americas", "Remote", "International"],
+    "GLOBAL": ["Worldwide", "Anywhere", "Global", "Remote", "International"],
+}
+_HIMALAYAS_EXCL_TERMS = {
+    "LATAM":  ["United States", "United Kingdom", "Canada", "Australia",
+               "Germany", "France", "India", "Brazil", "Poland", "Ukraine",
+               "Israel", "Europe", "European Union", "Mexico", "Argentina",
+               "Colombia", "China", "Japan"],
+    "EUROPE": ["United States", "India", "Australia", "China", "Japan"],
+    "ASIA":   ["United States", "Europe", "European Union", "Latin America"],
+    "USA":    ["Europe", "European Union", "India", "Australia"],
+    "GLOBAL": [],
+}
 
-_HIMALAYAS_LOC_OK = re.compile(
-    r"\b(Worldwide|Anywhere|Global|LATAM|Latin America|South America|"
-    r"Remote|Americas|International)\b",
-    re.I,
-)
+_him_ok   = _HIMALAYAS_OK_TERMS.get(_CANDIDATE_REGION,   _HIMALAYAS_OK_TERMS["LATAM"])
+_him_excl = _HIMALAYAS_EXCL_TERMS.get(_CANDIDATE_REGION, _HIMALAYAS_EXCL_TERMS["LATAM"])
+_HIMALAYAS_LOC_OK      = re.compile(r"\b(" + "|".join(_him_ok)   + r")\b", re.I)
+_HIMALAYAS_LOC_EXCLUDE = re.compile(r"\b(" + "|".join(_him_excl) + r")\b", re.I) if _him_excl else re.compile(r"(?!x)")
 
 # Detecta país/ciudad en la URL del job (cuando worldwide=true falla)
 _HIMALAYAS_URL_COUNTRY = re.compile(
@@ -546,11 +577,11 @@ def discover_himalayas() -> list[dict]:
 
 
 def filter_himalayas_location(jobs: list[dict]) -> list[dict]:
-    """Filtra jobs de Himalayas por accesibilidad desde Ecuador.
+    """Filtra jobs de Himalayas por accesibilidad según CANDIDATE_REGION.
 
     - Sin locationRestrictions → pasa
-    - Worldwide/LATAM/Global → pasa
-    - País específico sin Ecuador → excluye
+    - Worldwide/Global o región del candidato → pasa
+    - País/región incompatible → excluye
     - Ambiguo → pasa con location_warning
     """
     result = []
@@ -573,12 +604,12 @@ def filter_himalayas_location(jobs: list[dict]) -> list[dict]:
 
 
 def filter_global_remote(jobs: list[dict]) -> list[dict]:
-    """Filtra jobs por accesibilidad desde Ecuador.
+    """Filtra jobs por accesibilidad según CANDIDATE_REGION en .env.
 
-    - Sin location_required → pasa (ej. GetOnBrd nativo, RemoteOK sin ciudad)
-    - Worldwide/Anywhere/LATAM/Global/Americas → pasa
-    - USA only / UK only / etc. → excluye
-    - Ambiguo (North America, Europe, ciudad) → pasa con flag location_warning
+    - Sin location_required → pasa
+    - Worldwide/Anywhere/Global o región del candidato → pasa
+    - Región incompatible (ej. USA only para candidato LATAM) → excluye
+    - Ambiguo (ciudad, región parcial) → pasa con flag location_warning
     """
     result = []
     for job in jobs:

@@ -27,8 +27,8 @@ CANDIDATE = {
     "country": os.getenv("CANDIDATE_COUNTRY", ""),
     "linkedin": os.getenv("CANDIDATE_LINKEDIN", ""),
     "github": os.getenv("CANDIDATE_GITHUB", ""),
-    "cv_path": os.getenv("CV_PATH", "profile/CV_Mickaell_Moran.pdf"),
-    "cv_path_en": os.getenv("CV_PATH_EN", "profile/CV_Mickaell_Moran_EN.pdf"),
+    "cv_path": os.getenv("CV_PATH", "profile/cv.pdf"),
+    "cv_path_en": os.getenv("CV_PATH_EN", "profile/cv_en.pdf"),
     "website": os.getenv("CANDIDATE_WEBSITE", ""),
 }
 

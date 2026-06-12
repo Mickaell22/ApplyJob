@@ -21,8 +21,8 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `setup_gob_session.py` — guarda sesion GetOnBrd una vez (magic link); requerido para auto-apply en GetOnBrd
 - `profile/cv.md` — perfil del candidato en español (stack, experiencia, skills)
 - `profile/cv_en.md` — perfil del candidato en INGLES (para ofertas en ingles, ej. Canonical)
-- `profile/CV_Mickaell_Moran.pdf` — CV en PDF (español)
-- `profile/CV_Mickaell_Moran_EN.pdf` — CV en PDF (ingles, para Canonical y ofertas EN)
+- `profile/cv.pdf` — CV en PDF (español); ruta en `CV_PATH` del .env
+- `profile/cv_en.pdf` — CV en PDF (ingles); ruta en `CV_PATH_EN` del .env
 - `output/cartas/` — cartas generadas (GITIGNORED: contienen datos de contacto reales/PII)
 - `output/canonical_form_answers.txt` — respuestas reutilizables para formularios Canonical (GITIGNORED)
 - `.gob_session.json` — sesion guardada de GetOnBrd para auto-apply (GITIGNORED)
@@ -52,7 +52,7 @@ Usa Playwright headless Chromium para llenar formularios de postulacion.
 
 **Modo dry_run:** `run(jobs_with_letters, dry_run=True)` — llena formulario pero NO hace submit.
 
-**Candidate data:** El dict `CANDIDATE` se carga 100% desde `.env` (CANDIDATE_NAME, _PHONE, _LOCATION, _CITY, _COUNTRY, _LINKEDIN, _GITHUB, _WEBSITE + GMAIL_USER, CV_PATH, CV_PATH_EN). Sin PII hardcodeada en el repo.
+**Candidate data:** El dict `CANDIDATE` se carga 100% desde `.env` (CANDIDATE_NAME, _PHONE, _LOCATION, _CITY, _COUNTRY, _LINKEDIN, _GITHUB, _WEBSITE + GMAIL_USER, CV_PATH, CV_PATH_EN). Sin PII hardcodeada en el repo. Fallbacks genéricos (no personales) si falta la var.
 
 **Soporte bilingüe:** `run(jobs_with_letters, lang="en")` usa `CV_PATH_EN` (PDF EN) en lugar del PDF ES. Default `lang="es"`.
 
@@ -74,6 +74,7 @@ El perfil esta en `profile/cv.md`. Se extraen tecnologias via regex de las secci
 - Prompt incluye: titulo oferta, empresa, descripcion, datos del candidato, perfil completo
 - `lang="es"` (default) genera en español; `lang="en"` en ingles (para Canonical y ofertas en ingles)
 - Output: carta profesional, sin emojis, <250 palabras, con datos de contacto reales
+- Todos los datos del candidato (nombre, email, teléfono, linkedin, github, ubicacion) se extraen del `profile` dict o del `.env`. Sin fallbacks personales hardcodeados.
 
 **OJO con ofertas que prohiben IA:** Canonical declara explicitamente que el uso de IA/contenido
 generado descalifica la solicitud. Para esas, el candidato debe escribir carta y respuestas con
@@ -85,18 +86,22 @@ sus propias palabras (traducir el CV factual si es aceptable). No pegar texto ge
 DEEPSEEK_API_KEY=sk-...
 GMAIL_USER=tu-correo@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
-CV_PATH=./profile/CV_Mickaell_Moran.pdf
-CV_PATH_EN=./profile/CV_Mickaell_Moran_EN.pdf
+CV_PATH=./profile/cv.pdf
+CV_PATH_EN=./profile/cv_en.pdf
 
-# Datos del candidato (apply_ats.py los usa para llenar formularios ATS)
+# Datos del candidato — usados en cartas (cover.py) y formularios ATS (apply_ats.py)
 CANDIDATE_NAME=...
 CANDIDATE_PHONE=...
-CANDIDATE_LOCATION=...
+CANDIDATE_LOCATION=...      # alternativa a CITY+COUNTRY
 CANDIDATE_CITY=...
 CANDIDATE_COUNTRY=...
 CANDIDATE_LINKEDIN=...
 CANDIDATE_GITHUB=...
 CANDIDATE_WEBSITE=
+
+# Región geográfica — controla filter_global_remote y filter_himalayas_location
+# Opciones: LATAM (default), EUROPE, ASIA, USA, GLOBAL
+CANDIDATE_REGION=LATAM
 
 # GetOnBrd (opcional — default: .gob_session.json en raiz del proyecto)
 GETONBRD_SESSION_PATH=./.gob_session.json
@@ -130,7 +135,7 @@ Pipeline de descubrimiento multi-board → filtrado → generacion de cartas. Po
 2. Sin senior/lead/architect/ssr en titulo (`_SENIOR_EXCLUDE`)
 3. Sin "3+ años de experiencia" en descripcion (`_EXP_EXCLUDE`)
 4. [Himalayas] `worldwide=true` en API + exclusion por URL de país (`_HIMALAYAS_URL_COUNTRY`)
-5. [WWR/4DW/RFJ/WN] `filter_global_remote` — excluye paises sin Ecuador, marca ambiguos con `[!]`
+5. [WWR/4DW/RFJ/WN] `filter_global_remote` — excluye paises incompatibles con `CANDIDATE_REGION`, marca ambiguos con `[!]`
 
 **Jobs con [!] en location:** son ambiguos (ciudad en vez de pais) — revisarlos antes de postular.
 
@@ -156,11 +161,11 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `filter_tech(jobs)` — keywords tecnicas en titulo
 - `filter_junior(jobs)` — excluye senior/lead/ssr/etc en titulo
 - `filter_entry_level(jobs)` — excluye si descripcion pide 3+ años
-- `filter_global_remote(jobs)` — excluye country-restricted (USA/UK/etc); agrega `location_warning` a los ambiguos
+- `filter_global_remote(jobs)` — excluye ubicaciones incompatibles con `CANDIDATE_REGION`; agrega `location_warning` a los ambiguos
 - `getonbrd_apply_url(url)` — retorna `{url}/applications/new`
 - `resolve_apply_url(url)` — encuentra URL ATS externa via Playwright
 
-## Current State (2026-06-09)
+## Current State (2026-06-12)
 
 - CV bilingüe completo: `profile/cv.md` (ES) + `profile/cv_en.md` (EN) + PDFs en ambos idiomas.
 - `cover.generate` soporta `lang="es"/"en"`. `apply_ats.run()` soporta `lang="en"` para subir CV EN.
@@ -179,6 +184,7 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `run_batch.py` reescrito (2026-06-07): parsea boletin JuniorJobs (canal Telegram dominical), detecta banderas de pais, extrae empresa+titulo, corre mismo pipeline que run_discover.py. Usar cada domingo con el texto del boletin.
 - `_LOCATION_OK` regex: NO incluir "Remote" suelto — "Japan - Remote" lo matchea como falso positivo. Solo Worldwide/Anywhere/Global/Americas/LATAM/International.
 - `filter_global_remote` bug corregido (2026-06-07): referencia a `_REMOTEOK_LOC_EXCLUDE` inexistente eliminada.
+- Refactor (2026-06-12): eliminados todos los datos personales hardcodeados del repo. `cover.py`, `apply_ats.py` y `boards.py` ahora obtienen todo desde `.env`. Filtros geográficos configurables via `CANDIDATE_REGION` (LATAM/EUROPE/ASIA/USA/GLOBAL). Proyecto usable por cualquier candidato sin tocar el código fuente.
 - Portafolio actualizado (2026-06-08): 5 proyectos nuevos en ES+EN — MotoVox (Flutter+C+WebRTC+FFI), Flores Eternas (Node.js+SRI Ecuador), Taller App (Node.js+React freelance), ApplyJob (Python+Playwright+AI), QR Shield (Python+Chrome Extension). GitHub links agregados a Centro Tia Glenda, EcuaInventario y Facturador.
 - CV React (`lib/cv/content.ts`) actualizado (2026-06-08): bullet Flores Eternas en Freelance + MotoVox como 5to proyecto. PDFs ES/EN regenerados.
 - GitHub limpiado (2026-06-08): READMEs y About descriptions en todos los repos publicos. TIER 1: TiaGlenda (prod), EcuaInventario, Facturador, SimuladorExamenes. TIER 2: MotoVox, TallerApp. TIER 3: qr-shield, mcp-context-server (3★), ApplyJob.

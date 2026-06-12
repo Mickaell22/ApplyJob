@@ -26,28 +26,29 @@ ofertas --------->| Scraper  |--->| Matcher  |--->| Cover   |--->| Apply ATS |--
 ```
 ApplyJob/
 ├── main.py              # orquestador del pipeline
+├── run_discover.py      # pipeline completo: descubre boards → filtra → genera cartas
+├── run_batch.py         # batch: scrapea y genera cartas desde URLs
+├── run_manual.py        # batch: usa descripciones manuales (cuando scraping falla)
+├── run_today.py         # genera cartas para la shortlist del dia
 ├── profile/
-│   ├── cv.md                    # perfil del candidato en español
-│   ├── cv_en.md                 # perfil del candidato en ingles
-│   ├── CV_Mickaell_Moran.pdf    # CV en PDF (español)
-│   ├── CV_Mickaell_Moran_EN.pdf # CV en PDF (ingles)
-│   └── cv_template.md           # template de perfil
+│   ├── cv.md            # perfil del candidato en español
+│   ├── cv_en.md         # perfil del candidato en ingles
+│   ├── cv.pdf           # CV en PDF (español)      ← CV_PATH en .env
+│   ├── cv_en.pdf        # CV en PDF (ingles)        ← CV_PATH_EN en .env
+│   └── cv_template.md   # plantilla de perfil para nuevos usuarios
 ├── src/
+│   ├── boards.py        # descubre ofertas desde 6+ tableros remotos
 │   ├── scraper.py       # extrae informacion de ofertas desde URLs
 │   ├── profile.py       # carga y parsea el CV/perfil
 │   ├── matcher.py       # calcula compatibilidad oferta vs perfil
-│   ├── cover.py         # genera carta via DeepSeek Flash (es/en via param lang)
-│   ├── apply_ats.py     # auto-postulacion en ATS via Playwright (soporta lang=en)
+│   ├── cover.py         # genera carta via DeepSeek (es/en); datos 100% desde .env
+│   ├── apply_ats.py     # auto-postulacion en ATS via Playwright
 │   ├── letter_to_pdf.py # convierte cartas .txt a PDF via python-docx + LibreOffice
 │   ├── inbox.py         # lector IMAP para boletines
 │   └── sender.py        # envia correo via Gmail SMTP
 ├── samples/             # boletines de ofertas guardados
 ├── output/
 │   └── cartas/          # cartas generadas (gitignored: contienen PII)
-├── run_batch.py         # batch: scrapea y genera cartas
-├── run_manual.py        # batch: usa descripciones manuales
-├── run_today.py         # genera cartas para la shortlist de la fecha actual
-├── test_apply.py        # test del modulo apply_ats
 └── .env                 # variables de entorno (no versionado)
 ```
 
@@ -76,30 +77,102 @@ playwright install chromium
 
 ## Configuracion
 
-Crear archivo `.env` en la raiz del proyecto:
+**1. Crea tu `.env`** copiando el ejemplo:
+
+```bash
+cp .env.example .env
+# Edita .env con tu editor y llena todos los valores
+```
+
+**2. Crea tu perfil** a partir del template:
+
+```bash
+cp profile/cv_template.md profile/cv.md
+# Edita profile/cv.md con tu experiencia, stack y datos de contacto
+```
+
+Si vas a postular a empresas en inglés, crea también `profile/cv_en.md` con la misma estructura en inglés.
+
+**3. Pon tus CVs en PDF:**
 
 ```
+profile/cv.pdf      ← CV en español (o tu idioma principal)
+profile/cv_en.pdf   ← CV en inglés (opcional, para ofertas EN)
+```
+
+Las rutas se configuran en `.env` con `CV_PATH` y `CV_PATH_EN`.
+
+---
+
+### Variables del `.env`
+
+```env
+# IA
 DEEPSEEK_API_KEY=sk-...
+
+# Correo
 GMAIL_USER=tu-correo@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
-CV_PATH=./profile/CV_Mickaell_Moran.pdf
-CV_PATH_EN=./profile/CV_Mickaell_Moran_EN.pdf
 
-# Datos del candidato (apply_ats.py los usa para llenar formularios ATS)
-CANDIDATE_NAME=...
-CANDIDATE_PHONE=...
-CANDIDATE_LOCATION=...
-CANDIDATE_CITY=...
-CANDIDATE_COUNTRY=...
-CANDIDATE_LINKEDIN=...
-CANDIDATE_GITHUB=...
-CANDIDATE_WEBSITE=
+# CVs en PDF (español e inglés)
+CV_PATH=./profile/cv.pdf
+CV_PATH_EN=./profile/cv_en.pdf
+
+# Datos del candidato — usados en cartas y formularios ATS
+CANDIDATE_NAME=Tu Nombre
+CANDIDATE_PHONE=+1 234 567 8900
+CANDIDATE_LOCATION=Ciudad, País
+CANDIDATE_CITY=Ciudad
+CANDIDATE_COUNTRY=País
+CANDIDATE_LINKEDIN=https://linkedin.com/in/tu-perfil
+CANDIDATE_GITHUB=https://github.com/tu-usuario
+CANDIDATE_WEBSITE=https://tu-portafolio.com
+
+# Región geográfica — filtra ofertas inaccesibles para tu ubicación
+# Opciones: LATAM (default), EUROPE, ASIA, USA, GLOBAL
+CANDIDATE_REGION=LATAM
 ```
 
 ### Como obtener las credenciales
 
 - **DeepSeek API key**: [platform.deepseek.com](https://platform.deepseek.com) -> API Keys
 - **Gmail App Password**: https://myaccount.google.com/apppasswords (requiere 2FA activado)
+
+## Discovery Pipeline
+
+`run_discover.py` descubre ofertas de múltiples tableros, las filtra y genera cartas automáticamente.
+
+```bash
+# Todos los boards
+python run_discover.py --no-apply
+
+# Un board específico
+python run_discover.py getonbrd
+python run_discover.py himalayas
+python run_discover.py weworkremotely
+python run_discover.py 4dayweek
+python run_discover.py remotefirstjobs
+python run_discover.py workingnomads
+```
+
+**Boards soportados:**
+
+| Board | Fuente | Filtro seniority |
+|---|---|---|
+| GetOnBrd | API JSON | Excluye Senior/Lead por ID |
+| Himalayas | API JSON | Entry-level + Mid-level nativo |
+| We Work Remotely | RSS XML | Manual (título) |
+| 4 Day Week | API JSON | `level=entry,mid` en API |
+| Remote First Jobs | API JSON | `entry_level/middle/intern` |
+| Working Nomads | API JSON | Manual (título) |
+
+**Filtros en cascada:**
+1. Keywords técnicas en título (`TECH_FILTER`)
+2. Excluye senior/lead/architect en título
+3. Excluye descripciones con "3+ años de experiencia"
+4. `filter_global_remote` — excluye restricciones geográficas incompatibles con `CANDIDATE_REGION`
+
+**Jobs marcados con `[!]`** en location son ambiguos (ciudad en lugar de país) — revisar antes de postular.
 
 ## Uso
 

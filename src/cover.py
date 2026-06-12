@@ -68,13 +68,15 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
     """
 
     raw = profile.get("raw", "")
-    nombre = profile.get("name", _extract(raw, r"^#\s+(.+)", "Mickaell Moran"))
-    email = profile.get("email", _extract(raw, r"[\w.+-]+@[\w-]+\.[\w.]+", "mickaelmoranvera03@gmail.com"))
-    telefono = _extract(raw, r"\+?\d[\d\s()-]{7,}", "+593 98 377 7036")
-    linkedin = _extract(raw, r"https?://(?:www\.)?linkedin\.com[^\s]+", "")
-    github = _extract(raw, r"https?://(?:www\.)?github\.com[^\s]+", "")
+    nombre = profile.get("name", _extract(raw, r"^#\s+(.+)", os.getenv("CANDIDATE_NAME", "")))
+    email = profile.get("email", _extract(raw, r"[\w.+-]+@[\w-]+\.[\w.]+", os.getenv("GMAIL_USER", "")))
+    telefono = _extract(raw, r"\+?\d[\d\s()-]{7,}", os.getenv("CANDIDATE_PHONE", ""))
+    linkedin = _extract(raw, r"https?://(?:www\.)?linkedin\.com[^\s]+", os.getenv("CANDIDATE_LINKEDIN", ""))
+    github = _extract(raw, r"https?://(?:www\.)?github\.com[^\s]+", os.getenv("CANDIDATE_GITHUB", ""))
     portfolio = os.getenv("CANDIDATE_WEBSITE", "")
-    ubicacion = "Guayaquil, Ecuador"
+    _city = os.getenv("CANDIDATE_CITY", "")
+    _country = os.getenv("CANDIDATE_COUNTRY", "")
+    ubicacion = os.getenv("CANDIDATE_LOCATION") or ", ".join(filter(None, [_city, _country]))
 
     unknown_note = _unknown_tech_note(job.get("description", ""), lang)
 
