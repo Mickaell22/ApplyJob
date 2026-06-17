@@ -9,6 +9,10 @@ profile/cv_en.md
 profile/cv.pdf
 profile/CV_*.pdf
 *.pdf
+!profile/cv_es.pdf
+!profile/cv_en.pdf
+!profile/cv_es.docx
+!profile/cv_en.docx
 
 # Cartas generadas — contienen datos de contacto reales (PII), no versionar
 output/cartas/

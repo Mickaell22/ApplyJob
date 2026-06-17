@@ -21,8 +21,11 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `setup_gob_session.py` — guarda sesion GetOnBrd una vez (magic link); requerido para auto-apply en GetOnBrd
 - `profile/cv.md` — perfil del candidato en español (stack, experiencia, skills)
 - `profile/cv_en.md` — perfil del candidato en INGLES (para ofertas en ingles, ej. Canonical)
-- `profile/cv.pdf` — CV en PDF (español); ruta en `CV_PATH` del .env
-- `profile/cv_en.pdf` — CV en PDF (ingles); ruta en `CV_PATH_EN` del .env
+- `profile/cv_es.pdf` — CV en PDF formato Harvard (español); ruta en `CV_PATH` del .env
+- `profile/cv_en.pdf` — CV en PDF formato Harvard (ingles); ruta en `CV_PATH_EN` del .env
+- `profile/cv_es.docx` — fuente editable del CV ES (formato Harvard)
+- `profile/cv_en.docx` — fuente editable del CV EN (formato Harvard)
+- `profile/generate_cv.py` — script que genera los .docx desde cero (python-docx); correr para regenerar
 - `output/cartas/` — cartas generadas (GITIGNORED: contienen datos de contacto reales/PII)
 - `output/canonical_form_answers.txt` — respuestas reutilizables para formularios Canonical (GITIGNORED)
 - `.gob_session.json` — sesion guardada de GetOnBrd para auto-apply (GITIGNORED)
@@ -165,7 +168,7 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `getonbrd_apply_url(url)` — retorna `{url}/applications/new`
 - `resolve_apply_url(url)` — encuentra URL ATS externa via Playwright
 
-## Current State (2026-06-12)
+## Current State (2026-06-16)
 
 - CV bilingüe completo: `profile/cv.md` (ES) + `profile/cv_en.md` (EN) + PDFs en ambos idiomas.
 - `cover.generate` soporta `lang="es"/"en"`. `apply_ats.run()` soporta `lang="en"` para subir CV EN.
@@ -190,6 +193,13 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - GitHub limpiado (2026-06-08): READMEs y About descriptions en todos los repos publicos. TIER 1: TiaGlenda (prod), EcuaInventario, Facturador, SimuladorExamenes. TIER 2: MotoVox, TallerApp. TIER 3: qr-shield, mcp-context-server (3★), ApplyJob.
 - Output files (gitignored): `output/sezzle_latam_answers.txt`, `output/monterail_pick_one_tool.txt`, `output/tritone_why.txt`, `output/tritone_why_en.txt`, `output/getonbrd_perfil_actualizado.txt`, `output/getonbrd_perfil_actualizado_en.txt`.
 - Observacion del pipeline (2026-06-09): de 256 cartas generadas, la mayoria son senior/geo-restringidas (India, UK, US, LATAM especifico sin Ecuador). Los validos aplicados: Bluelight x3, Sezzle, Monterail, Tritone, EasyAudit AI, BC Tecnologia x3, Idealista, Designcafe. Pattern: Remote First Jobs genera muchos falsos positivos de seniority; revisar individualmente antes de postular.
+- CV rehecho (2026-06-14): nuevo formato Harvard via python-docx. `profile/generate_cv.py` genera ES+EN .docx → convertir a PDF con LibreOffice. CVs en portafolio (`mickaell-portafolio/public/`) también actualizados. `CV_PATH`/`CV_PATH_EN` en .env apuntan a `cv_es.pdf`/`cv_en.pdf`.
+- Sesion 2026-06-14: 11 postulaciones enviadas — Lazo, Ryz Labs, Linqia, Siena, vvd, POS+ (email), South Geeks, Espeo (6 semanas), Chief Rebel (email), Sticker Mule, Mindrift.
+- Rechazos 2026-06-14: POS+ (Jordan Thaeler — "requires more experience"; vivió en Quito, recomendó Kushki para más adelante). Espeo (2026-06-16, otro candidato). Clerkie (2026-06-16, internship antiguo).
+- Sezzle (2026-06-14): avanzó a Wonderlic assessment — completado. Resultado: Strong Problem-Solver + Highly Candid + Applied Work. Video proctoring: error en Google Form al subir, se reportó al equipo via formulario de contacto. En espera.
+- Para el futuro: **Kushki** (fintech Ecuador, recomendado por Jordan de POS+) — aplicar cuando haya más experiencia.
+- Postulaciones activas al 2026-06-16: ~20 (Lazo, Ryz Labs, Linqia, Siena, vvd, South Geeks, Chief Rebel, Sticker Mule, Mindrift, Sezzle en proceso, + anteriores aún activas).
+- Tech Holding Frontend Engineer WME (504): rechazado (2026-06-16) — llegó a entrevista AI pero no avanzó. Plataforma: Paradox/HireVue (AI interview). Candidato quiere practicar entrevistas AI antes de próximas rondas.
 
 ## Common Issues
 

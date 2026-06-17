@@ -146,14 +146,17 @@ if not only_board or only_board == "glovo":
 # Filtros en cascada
 tech_jobs   = boards.filter_tech(discovered)
 junior_jobs = boards.filter_junior(tech_jobs)
+clean_jobs  = boards.filter_role_noise(junior_jobs)
+clean_jobs  = boards.dedup_by_company_title(clean_jobs)
 # filter_entry_level necesita la descripcion; se aplica despues de scraping
 
 print(
     f"\nTotal: {len(discovered)} → {len(tech_jobs)} técnicas "
-    f"→ {len(junior_jobs)} sin senior/lead\n"
+    f"→ {len(junior_jobs)} sin senior/lead "
+    f"→ {len(clean_jobs)} sin ruido/duplicados\n"
 )
 
-if not junior_jobs:
+if not clean_jobs:
     print("[!] No se encontraron ofertas. Verifica conexión o estructura del board.")
     sys.exit(0)
 
@@ -172,7 +175,7 @@ print(f"CV cargado: {len(cv.get('techs', []))} tecnologias\n")
 results      = []  # cartas generadas y con URL ATS resuelta
 no_ats_urls  = []  # jobs sin URL ATS detectable (aplica manual)
 
-for job in junior_jobs:
+for job in clean_jobs:
     print("=" * 64)
     print(f"[{job['source'].upper():10}] {job['title']}")
     print(f"  URL: {job['url']}")

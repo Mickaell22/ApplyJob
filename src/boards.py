@@ -32,7 +32,7 @@ TECH_FILTER = re.compile(
 
 # Excluye títulos claramente senior/lead/architect para no perder tiempo
 _SENIOR_EXCLUDE = re.compile(
-    r"\b(senior|sr\.?|ssr|semi.?senior|intermedio|mid.?level|lead|architect|"
+    r"\b(senior|s[êe]nior|sr\.?|ssr|semi.?senior|intermedio|mid.?level|lead|architect|"
     r"principal|staff|manager|head\s+of|director|expert|experto|l[íi]der|"
     r"jefe|c\.?t\.?o|v\.?p\.?|founding)\b",
     re.I,
@@ -56,10 +56,31 @@ _REGION_OK_TERMS = {
     "USA":    ["United States", "North America", "Americas"],
     "GLOBAL": [],
 }
+_NON_LATAM_COUNTRIES = [
+    # Europe
+    "Germany", "France", "Spain", "Italy", "Poland", "Netherlands", "Belgium",
+    "Sweden", "Norway", "Denmark", "Finland", "Austria", "Switzerland",
+    "Czech Republic", "Hungary", "Romania", "Bulgaria", "Portugal", "Ireland",
+    "Greece", "Ukraine", "Malta", "Serbia", "Bosnia", "Lithuania", "Latvia",
+    "Estonia", "Croatia", "Slovakia", "Luxembourg", "United Kingdom",
+    # Asia & Middle East
+    "India", "China", "Japan", "South Korea", "Taiwan", "Philippines",
+    "Indonesia", "Vietnam", "Thailand", "Malaysia", "Singapore", "Pakistan",
+    "Bangladesh", "Saudi Arabia", "UAE", "United Arab Emirates", "Israel",
+    "Turkey", "Sri Lanka",
+    # Oceania
+    "Australia", "New Zealand",
+    # Africa
+    "Nigeria", "South Africa", "Kenya", "Egypt",
+    # North America (non-LATAM)
+    "Canada",
+]
+
 _REGION_EXCL_TERMS = {
-    "LATAM":  ["USA", "US only", "United States", "UK only", "United Kingdom",
-               "Europe only", "EU only", "Canada only", "Australia only",
-               "Brazil only", "Mexico only", "Argentina only", "Colombia only", "India only"],
+    "LATAM":  [
+        "USA", "US only", "United States", "Europe only", "EU only",
+        "Brazil only", "Mexico only", "Argentina only", "Colombia only",
+    ] + _NON_LATAM_COUNTRIES,
     "EUROPE": ["USA", "US only", "United States", "LATAM only", "Latin America only",
                "India only", "Australia only"],
     "ASIA":   ["USA", "US only", "United States", "Europe only", "EU only",
@@ -884,6 +905,41 @@ def filter_entry_level(jobs: list[dict]) -> list[dict]:
         desc_text = re.sub(r"<[^>]+>", " ", desc)
         if _EXP_EXCLUDE.search(desc_text):
             continue
+        result.append(job)
+    return result
+
+
+_NOISE_TITLE_EXCLUDE = re.compile(
+    r"\b(?:devops\s+engineer|junior\s+devops|devops\s+virtual|network\s+devops\s+engineer|"
+    r"devops\s+e\s+platform|engenheiro\s+devops|pessoa\s+engenheira\s+de\s+devops|"
+    r"devsecops\s+engineer|site\s+reliability\s+engineer|"
+    r"qa\s+engineer|quality\s+assurance\s+engineer|quality\s+automation\s+engineer|"
+    r"automation\s+tester|manual\s+qa|"
+    r"sales\s+engineer|support\s+engineer|"
+    r"data\s+engineer|"
+    r"trading\s+operations\s+engineer|finops\s+analyst|"
+    r"field\s+service\s+technician|systems?\s+administrator)\b",
+    re.I,
+)
+
+
+def filter_role_noise(jobs: list[dict]) -> list[dict]:
+    """Excluye roles fuera del stack del candidato (DevOps puro, QA, Sales, SRE, etc.)."""
+    return [j for j in jobs if not _NOISE_TITLE_EXCLUDE.search(j.get("title", ""))]
+
+
+def dedup_by_company_title(jobs: list[dict]) -> list[dict]:
+    """Elimina duplicados por (empresa, título) — ej: Mindrift mismo job en 10 países."""
+    seen: set[tuple] = set()
+    result = []
+    for job in jobs:
+        key = (
+            re.sub(r"\s+", " ", (job.get("company") or "").lower().strip()),
+            re.sub(r"\s+", " ", (job.get("title") or "").lower().strip()),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
         result.append(job)
     return result
 
