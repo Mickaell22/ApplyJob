@@ -69,6 +69,7 @@ args = sys.argv[1:]
 only_board  = next((a for a in args if a in (
     "getonbrd", "himalayas", "weworkremotely", "4dayweek",
     "remotefirstjobs", "workingnomads", "remotive", "glovo", "wellfound",
+    "linkedin", "hackernews",
 )), None)
 remote_only = "--no-remote" not in args
 dry_run     = "--dry-run" in args
@@ -130,6 +131,20 @@ if not only_board or only_board == "remotive":
     remotive_global = boards.filter_global_remote(remotive_jobs)
     print(f"  {len(remotive_jobs)} ofertas → {len(remotive_global)} con acceso global/LATAM")
     discovered.extend(remotive_global)
+
+if not only_board or only_board == "linkedin":
+    print("\nLinkedIn (jobs-guest)...")
+    li_jobs = boards.discover_linkedin(remote_only=remote_only)
+    li_global = boards.filter_global_remote(li_jobs)
+    print(f"  {len(li_jobs)} ofertas → {len(li_global)} accesibles desde Ecuador")
+    discovered.extend(li_global)
+
+if not only_board or only_board == "hackernews":
+    print("\nHacker News (Who is hiring)...")
+    hn_jobs = boards.discover_hackernews()
+    hn_global = boards.filter_global_remote(hn_jobs)
+    print(f"  {len(hn_jobs)} ofertas → {len(hn_global)} accesibles desde Ecuador")
+    discovered.extend(hn_global)
 
 if not only_board or only_board == "wellfound":
     print("\nWellfound (wellfound.com)...")

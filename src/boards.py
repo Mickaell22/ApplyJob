@@ -11,6 +11,7 @@ Boards soportados:
 import json
 import os
 import re
+import time
 import httpx
 from bs4 import BeautifulSoup
 
@@ -862,6 +863,202 @@ def discover_glovo(tech_only: bool = True) -> list[dict]:
 
         if jobs:  # si una fuente da resultados, no seguir con la siguiente
             break
+
+    return jobs
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn (jobs-guest endpoint público, SIN login)
+# ---------------------------------------------------------------------------
+
+_LINKEDIN_GUEST_URL = (
+    "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+)
+
+# Headers realistas obligatorios — sin Accept-Language en-US → bloqueo
+_LINKEDIN_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+_LINKEDIN_KEYWORDS = [
+    "python developer", "full stack developer", "backend developer",
+    "react developer", "node.js developer", "django",
+]
+
+
+def discover_linkedin(
+    keywords: list[str] | None = None,
+    remote_only: bool = True,
+    max_pages: int = 3,
+) -> list[dict]:
+    """Descubre ofertas en LinkedIn via el endpoint guest (sin auth).
+
+    Itera keywords x páginas, parsea las tarjetas HTML y normaliza al schema.
+    Filtros nativos: f_WT=2 (remote), f_E=1,2 (Internship+Entry), f_TPR=última
+    semana. La descripción no viene en el listado → queda vacía y el pipeline
+    la scrapea después con fetch_job().
+
+    ponytail: rate-limit agresivo de LinkedIn (429). Techo conocido: vamos
+    lento (sleep 4s/página, max_pages bajo) y cortamos la keyword al primer
+    429. Upgrade si hiciera falta: proxy rotativo / backoff exponencial.
+    """
+    keywords = keywords or _LINKEDIN_KEYWORDS
+    seen: set[str] = set()
+    jobs: list[dict] = []
+
+    for kw in keywords:
+        for page in range(max_pages):
+            params = {
+                "keywords": kw,
+                "location": "Worldwide",
+                "f_E": "1,2",            # 1=Internship, 2=Entry level
+                "f_TPR": "r604800",      # publicado en la última semana
+                "start": page * 10,
+            }
+            if remote_only:
+                params["f_WT"] = "2"     # 2=Remote
+
+            try:
+                r = httpx.get(
+                    _LINKEDIN_GUEST_URL,
+                    params=params,
+                    headers=_LINKEDIN_HEADERS,
+                    timeout=20,
+                )
+            except Exception:
+                break
+            if r.status_code != 200:     # 429 u otro → abandonar esta keyword
+                break
+
+            soup = BeautifulSoup(r.text, "html.parser")
+            cards = soup.find_all("div", class_=re.compile(r"base-(search-)?card"))
+            if not cards:
+                break
+
+            for card in cards:
+                title_el = card.find(class_=re.compile(r"base-search-card__title"))
+                # Solo el link de la oferta (/jobs/view/...) — evita el link del
+                # logo de empresa (/company/...) que duplicaría cada tarjeta.
+                link_el = card.find("a", href=re.compile(r"/jobs/view/"))
+                if not title_el or not link_el:
+                    continue
+                url = (link_el.get("href") or "").split("?")[0].strip()
+                if not url or url in seen:
+                    continue
+                seen.add(url)
+
+                company_el = card.find(class_=re.compile(r"base-search-card__subtitle"))
+                loc_el = card.find(class_=re.compile(r"job-search-card__location"))
+                jobs.append({
+                    "title":             title_el.get_text(strip=True),
+                    "company":           company_el.get_text(strip=True) if company_el else "",
+                    "url":               url,
+                    "remote":            True if remote_only else None,
+                    "source":            "linkedin",
+                    "description":       "",
+                    "location_required": loc_el.get_text(strip=True) if loc_el else "",
+                })
+
+            time.sleep(4)  # ponytail: ir lento para no comerse un 429
+
+    return jobs
+
+
+# ---------------------------------------------------------------------------
+# Hacker News "Who is hiring?" (API Algolia, sin anti-bot)
+# ---------------------------------------------------------------------------
+
+_HN_SEARCH = "https://hn.algolia.com/api/v1/search_by_date"
+_HN_ITEM = "https://hn.algolia.com/api/v1/items/{}"
+
+
+def discover_hackernews() -> list[dict]:
+    """Descubre ofertas del hilo mensual "Ask HN: Who is hiring?" (Algolia API).
+
+    1) Busca el hilo whoishiring más reciente.
+    2) Trae sus comentarios de primer nivel (cada uno = una oferta).
+    3) Parseo heurístico de la primera línea (Company | Role | Location | ...),
+       filtra por 'remote' + keyword tech del candidato.
+
+    ponytail: parseo heurístico — el formato es libre, algunos campos saldrán
+    imperfectos. Aceptado por diseño; el [!] de filter_global_remote + revisión
+    manual cubren los ambiguos.
+    """
+    try:
+        r = httpx.get(
+            _HN_SEARCH,
+            params={
+                "tags": "story,author_whoishiring",
+                "query": "who is hiring",
+                "hitsPerPage": 5,
+            },
+            headers={**_HEADERS, "Accept": "application/json"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        hits = r.json().get("hits", [])
+    except Exception:
+        return []
+
+    thread_id = next(
+        (h.get("objectID") for h in hits
+         if "who is hiring" in (h.get("title") or "").lower()),
+        None,
+    )
+    if not thread_id:
+        return []
+
+    try:
+        r = httpx.get(
+            _HN_ITEM.format(thread_id),
+            headers={**_HEADERS, "Accept": "application/json"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        children = r.json().get("children", [])
+    except Exception:
+        return []
+
+    seen: set[str] = set()
+    jobs: list[dict] = []
+
+    for child in children:
+        text = child.get("text")
+        if not text:                      # comentario borrado
+            continue
+        plain = BeautifulSoup(text, "html.parser").get_text("\n").strip()
+        if not plain:
+            continue
+        if "remote" not in plain.lower() or not TECH_FILTER.search(plain):
+            continue
+
+        first_line = plain.split("\n", 1)[0]
+        parts = [p.strip() for p in first_line.split("|")]
+        company = parts[0] if parts else ""
+        role = parts[1] if len(parts) > 1 else first_line[:80]
+        # Todo lo que sigue a la empresa → material para el geo-filtro
+        location = " | ".join(parts[1:])[:60] if len(parts) > 1 else "Worldwide"
+
+        a = BeautifulSoup(text, "html.parser").find("a", href=True)
+        url = a["href"] if a else f"https://news.ycombinator.com/item?id={child.get('id')}"
+        if url in seen:
+            continue
+        seen.add(url)
+
+        jobs.append({
+            "title":             role,
+            "company":           company,
+            "url":               url,
+            "remote":            True,
+            "source":            "hackernews",
+            "description":       plain,
+            "location_required": location,
+        })
 
     return jobs
 

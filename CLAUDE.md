@@ -11,7 +11,7 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `src/matcher.py` — calcula % de compatibilidad oferta vs perfil
 - `src/cover.py` — genera carta personalizada con DeepSeek Flash (via Anthropic SDK)
 - `src/apply_ats.py` — auto-postulacion en ATS con Playwright; soporta Workable, Greenhouse, GetOnBrd (con sesion)
-- `src/boards.py` — descubre ofertas desde tableros: GetOnBrd, Himalayas, We Work Remotely (RSS), 4 Day Week (API), Remote First Jobs (API), Working Nomads (API), Remotive, Glovo; filtros junior/entry-level/global-remote
+- `src/boards.py` — descubre ofertas desde tableros: GetOnBrd, Himalayas, We Work Remotely (RSS), 4 Day Week (API), Remote First Jobs (API), Working Nomads (API), LinkedIn (jobs-guest), Hacker News (Who is hiring, API Algolia), Remotive, Glovo; filtros junior/entry-level/global-remote
 - `src/letter_to_pdf.py` — convierte cartas .txt a PDF via python-docx + LibreOffice
 - `src/sender.py` — envia carta por Gmail SMTP
 - `src/inbox.py` — lector IMAP para boletines de ofertas
@@ -122,6 +122,8 @@ Pipeline de descubrimiento multi-board → filtrado → generacion de cartas. Po
 .venv/bin/python3 run_discover.py 4dayweek          # solo 4 Day Week
 .venv/bin/python3 run_discover.py remotefirstjobs   # solo Remote First Jobs
 .venv/bin/python3 run_discover.py workingnomads     # solo Working Nomads
+.venv/bin/python3 run_discover.py linkedin          # solo LinkedIn (jobs-guest)
+.venv/bin/python3 run_discover.py hackernews        # solo Hacker News (Who is hiring)
 ```
 
 **Boards activos:**
@@ -131,6 +133,8 @@ Pipeline de descubrimiento multi-board → filtrado → generacion de cartas. Po
 - 4 Day Week      — API JSON, remote+entry/mid, ~25 candidatas por corrida
 - Remote First Jobs — API JSON, entry/middle/intern, ~168 candidatas por corrida
 - Working Nomads  — API JSON, 2 categorías, ~3-5 cartas/corrida
+- LinkedIn        — jobs-guest endpoint (sin login), ~28-56 crudas/corrida → ~10 candidatas; rate-limit agresivo (sleep 4s/página)
+- Hacker News     — hilo mensual "Who is hiring" (API Algolia), ~150 crudas → ~28 candidatas; parseo heurístico
 - Total tipico: 50-80 cartas/corrida (todos los boards)
 
 **Filtros en cascada:**
@@ -157,6 +161,8 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - `discover_4dayweek(max_pages)` — API JSON; params `work_arrangement=remote&level=entry,mid`; ~25 jobs/página; campo `locations[0].country` → location_required
 - `discover_remotefirstjobs(max_pages)` — API JSON; 6 queries tech, 2 páginas/query; filtra seniority `entry_level/middle/intern`; campo `locations` → location_required
 - `discover_workingnomads()` — API JSON (programming + devops-sysadmin); campo `location` → location_required
+- `discover_linkedin(keywords, remote_only, max_pages)` — endpoint guest público `jobs-guest/jobs/api/seeMoreJobPostings/search` (SIN login); parsea tarjetas HTML (`base-card`); filtros nativos `f_WT=2` (remote) + `f_E=1,2` (Internship+Entry) + `f_TPR` (última semana); solo links `/jobs/view/` (evita duplicar con `/company/`); `description=""` (la scrapea el pipeline). OJO: rate-limit 429 → `sleep(4)` por página, `max_pages` bajo, headers realistas con `Accept-Language: en-US` obligatorio
+- `discover_hackernews()` — API Algolia (sin anti-bot); busca hilo "Who is hiring" más reciente → trae `children` (cada comentario = una oferta) → parseo heurístico de la 1ª línea `Company | Role | Location | ...`; filtra por `remote` + `TECH_FILTER`; `description` = texto completo del comentario
 - `discover_wellfound()` — Playwright headless=False + intercepción GraphQL; requiere `.wellfound_session.json`; DESHABILITADO por default (captcha frecuente + pocos resultados Ecuador)
 - `filter_himalayas_location(jobs)` — passthrough (worldwide=true ya filtra en API)
 - `discover_remotive()` — API JSON (actualmente limitada a ~28 jobs fijos en tier free)
@@ -206,6 +212,7 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - Perfil Wellfound reconfigurado (2026-06-22): el candidato tenia Desired Salary en $500 (creyo que era mensual, el campo es ANUAL) — corregido a $24.000/anio. Cambiado a remote-only, bio/skills/preferencias actualizadas. Aprendizaje clave: un salario muy bajo descarta porque parece que el candidato no se valora. Textos en output/wellfound_profile.txt.
 - PENDIENTE: grabar la AI interview de Wellfound (reutilizable, asincrona ~15 min, presenta al candidato PRIMERO a las empresas y se comparte en futuras aplicaciones). Ofrecer guia de prep STAR antes de grabarla.
 - Boletin JuniorJobs (domingo) confirmado inutil para Ecuador-remoto: España/UE = exigen reubicacion/permiso UE (incluso roles "100% remoto" como Revolut Graduate 2027 que son hibridos con relocation a Poland/Portugal/Spain/UAE/UK + 3 dias oficina); LATAM = anclado a pais especifico (MX/CO/CL/AR/BR). Unico empleador global-remoto: Canonical (bloqueado hasta ~dic-2026 tras 4 rechazos + prohibe IA). NO correr el pipeline sobre las 256 ofertas (desperdicia API). Revolut Graduate 2027 (Python/Frontend): stack y timing encajan — reconsiderar SOLO si el candidato acepta reubicarse.
+- Boards agregados (2026-06-25): **LinkedIn** (`discover_linkedin`, endpoint jobs-guest sin login) y **Hacker News** (`discover_hackernews`, hilo "Who is hiring" via API Algolia). Motivo: las fuentes previas se saturan de senior/geo-restringidos; el mejor match del finde (Unumbio) lo halló el candidato a mano en LinkedIn. Probados en seco: LinkedIn ~56 crudas→10 candidatas, HN ~152→28. Integrados en `run_discover.py` (tuple `only_board` + bloques discover con `filter_global_remote`). LinkedIn: cuidado 429 (sleep 4s/página). HN: parseo heurístico (campos imperfectos, revisar `[!]`). Postulación sigue MANUAL.
 
 ## Common Issues
 
@@ -220,3 +227,5 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - GetOnBrd auto-apply requiere sesion activa en `.gob_session.json`. Magic link ES DE UN SOLO USO y expira en ~5 min. Flujo correcto: correr `setup_gob_session.py` → solicitar magic link → en el correo, clic derecho sobre el boton/link → "Copiar dirección" → pegarlo en la terminal del script. NO hacer clic en el link antes de pegarlo (invalida el link al abrirlo en el browser real).
 - GetOnBrd formulario es de 3 pasos: step 1 (cover letter Trix + nivel inglés), step 2 (phone/linkedin/github/reason), step 3 (preview). El submit de cada paso usa fetch() con credentials:include porque el Stimulus controller bloquea form.submit() nativo. GetOnBrd auto-crea drafts al navegar a /applications/new; el fetch bypassea eso.
 - GetOnBrd magic link puede pegarse directamente en `setup_gob_session.py` o ejecutar `python3 -c "..."` headless para autenticar sin browser visible (ver sesion 2026-06-05).
+- LinkedIn jobs-guest: cada tarjeta trae 2 links (`/jobs/view/` el real + `/company/` el del logo). Filtrar solo `/jobs/view/` o se duplica cada oferta. El rate-limit 429 es agresivo: ir lento (`sleep 4s`/página, `max_pages` 2-3) y `Accept-Language: en-US` obligatorio o bloquea.
+- Hacker News "Who is hiring": parseo heurístico de la 1ª línea del comentario (`Company | Role | Location | ...`); como el formato es libre, algunos `role`/`location` salen cruzados — `filter_junior`/`filter_role_noise` limpian downstream, pero revisar los `[!]` antes de postular.
