@@ -32,37 +32,27 @@ Uso:
 import re
 import sys
 import os
+import json
+import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
-from src import profile, matcher, cover, apply_ats
+# OJO: cover (DeepSeek/anthropic) se importa lazy mas abajo, solo con --with-cover.
+# Asi el modo listado (default, 0 API) corre sin la dependencia anthropic.
+from src import profile, matcher, apply_ats
 from src import boards
+from src import applied
 from src.scraper import fetch_job
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "cartas")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# URLs ya postuladas — se saltan para no duplicar
-_APPLIED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "applied_urls.txt")
-
-def _load_applied_urls() -> set:
-    if not os.path.exists(_APPLIED_FILE):
-        return set()
-    urls = set()
-    with open(_APPLIED_FILE, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                urls.add(line)
-    return urls
-
-def _mark_applied(url: str):
-    with open(_APPLIED_FILE, "a", encoding="utf-8") as f:
-        f.write(url + "\n")
-
-applied_urls = _load_applied_urls()
+# URLs ya postuladas (carta generada / envio real) y ya listadas en corridas
+# previas — se saltan para no duplicar. Logica compartida en src/applied.py.
+applied_urls = applied.load_applied()
+seen_urls    = applied.load_seen()
 
 # Argumentos
 args = sys.argv[1:]
@@ -74,6 +64,12 @@ only_board  = next((a for a in args if a in (
 remote_only = "--no-remote" not in args
 dry_run     = "--dry-run" in args
 no_apply    = "--no-apply" in args
+# Por defecto NO se generan cartas (cuesta API DeepSeek y el ~95% nunca se usa).
+# Descubrir lista candidatas gratis -> revisar links -> generar on-demand con
+# gen_cover.py. --with-cover fuerza el comportamiento viejo (carta para todas).
+with_cover  = "--with-cover" in args
+if with_cover:
+    from src import cover  # import lazy: solo necesita anthropic si se piden cartas
 
 # ---------------------------------------------------------------------------
 # Descubrir ofertas
@@ -203,6 +199,11 @@ for job in clean_jobs:
         print("  [✓] Ya postulada — omitida")
         continue
 
+    # Saltar si ya se listo en una corrida de descubrimiento previa
+    if job["url"] in seen_urls:
+        print("  [=] Ya listada antes — omitida (usa gen_cover.py si querés su carta)")
+        continue
+
     # Scrapear descripcion completa si la API no la trajo
     if not job.get("description") or len(job["description"]) < 200:
         print("  Scrapeando descripcion...")
@@ -240,36 +241,65 @@ for job in clean_jobs:
         print("  [x] Compatibilidad baja — omitida")
         continue
 
-    # Generar carta de presentacion
-    print("  Generando carta...")
-    try:
-        carta = cover.generate(job, cv)
-    except Exception as e:
-        print(f"  [!] Error generando carta: {e}")
-        continue
+    # Candidata valida → marcar como vista para no re-listarla mañana
+    applied.mark_seen(job["url"])
+    seen_urls.add(job["url"])
 
-    url_id = job["url"].rstrip("/").split("/")[-1]
-    slug = re.sub(r"[^a-z0-9]+", "_", url_id.lower())[:55].strip("_")
-    out_path = os.path.join(OUT_DIR, f"disc_{slug}.txt")
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(carta)
-    print(f"  Carta guardada: output/cartas/disc_{slug}.txt")
-    _mark_applied(job["url"])
-    applied_urls.add(job["url"])
-
-    # Construir URL del formulario de aplicación
-    if not no_apply and job["source"] == "getonbrd":
-        ats_url = boards.getonbrd_apply_url(job["url"])
-        job["ats_url"] = ats_url
+    # URL del formulario GetOnBrd (gratis de construir; util para listar y aplicar)
+    if job["source"] == "getonbrd":
+        job["ats_url"] = boards.getonbrd_apply_url(job["url"])
         job["ats_platform"] = "getonbrd"
-        print(f"  Apply URL: {ats_url[:70]}")
+
+    # Generar carta SOLO si se pidio (--with-cover). Por defecto solo se lista:
+    # cuesta API y el ~95% nunca se usa. Carta on-demand via gen_cover.py.
+    carta = None
+    out_path = None
+    if with_cover:
+        print("  Generando carta...")
+        try:
+            carta = cover.generate(job, cv)
+        except Exception as e:
+            print(f"  [!] Error generando carta: {e}")
+            carta = None
+        if carta:
+            url_id = job["url"].rstrip("/").split("/")[-1]
+            slug = re.sub(r"[^a-z0-9]+", "_", url_id.lower())[:55].strip("_")
+            out_path = os.path.join(OUT_DIR, f"disc_{slug}.txt")
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(carta)
+            print(f"  Carta guardada: output/cartas/disc_{slug}.txt")
+            applied.mark_applied(job["url"])
+            applied_urls.add(job["url"])
+    else:
+        print("  [+] Candidata listada (sin carta — gen_cover.py para generar)")
 
     results.append({"job": job, "match": match, "carta": carta, "path": out_path})
 
 # ---------------------------------------------------------------------------
-# Auto-apply (Workable / Greenhouse — plataformas soportadas)
+# Volcar candidatas a JSON para la fase on-demand (gen_cover.py --from-json)
 # ---------------------------------------------------------------------------
-if not no_apply:
+if results:
+    cand_path = os.path.join(OUT_DIR, f"candidates_{datetime.date.today()}.json")
+    with open(cand_path, "w", encoding="utf-8") as f:
+        json.dump(
+            [{"url": r["job"]["url"], "title": r["job"]["title"],
+              "company": r["job"].get("company", ""),
+              "source": r["job"]["source"],
+              "location": r["job"].get("location_required", ""),
+              "match": r["match"]["score"],
+              "description": r["job"].get("description", "")[:3000]}
+             for r in results],
+            f, ensure_ascii=False, indent=2,
+        )
+    api_tag = "con API (cartas generadas)" if with_cover else "0 API (solo listado)"
+    print(f"\nCandidatos guardados: {cand_path}  ({len(results)} ofertas, {api_tag})")
+    print(f"  Generá carta on-demand: python gen_cover.py --from-json {cand_path} --pick <n>")
+
+# ---------------------------------------------------------------------------
+# Auto-apply (Workable / Greenhouse — plataformas soportadas)
+# Requiere cartas generadas → solo con --with-cover.
+# ---------------------------------------------------------------------------
+if with_cover and not no_apply:
     supported = ("workable", "greenhouse", "getonbrd")
     to_apply = [r for r in results if r["job"].get("ats_platform") in supported]
     manual   = [r for r in results if r["job"].get("ats_platform") not in supported]
@@ -361,7 +391,8 @@ if not no_apply:
 # Resumen final
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 64)
-print(f"RESUMEN: {len(results)} cartas / {len(junior_jobs)} candidatas procesadas")
+_kind = "cartas" if with_cover else "candidatas listadas"
+print(f"RESUMEN: {len(results)} {_kind} / {len(junior_jobs)} candidatas procesadas")
 for r in results:
     j = r["job"]
     remote_tag = "REMOTO" if j.get("remote") else "presencial"

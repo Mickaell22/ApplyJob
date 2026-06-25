@@ -17,7 +17,9 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `src/inbox.py` — lector IMAP para boletines de ofertas
 - `run_batch.py` — batch: resuelve short URLs, scrapea con Playwright y genera cartas
 - `run_manual.py` — batch con descripciones manuales (cuando el scraping falla)
-- `run_discover.py` — pipeline completo: descubre boards → filtra → genera cartas → auto-aplica
+- `run_discover.py` — pipeline de descubrimiento: descubre boards → filtra → match → **LISTA candidatas (0 API)** y vuelca JSON. Cartas opt-in con `--with-cover`
+- `gen_cover.py` — genera UNA carta on-demand tras revisar el link a mano (por `<url>`, `--desc`, o `--from-json <candidates.json> --pick <n>`). El ÚNICO script que gasta API por carta real
+- `src/applied.py` — tracking compartido de URLs: `applied_urls.txt` (con carta/postuladas) + `output/seen_discovered.txt` (ya listadas, evita re-listar). Usado por `run_discover.py` y `gen_cover.py`
 - `setup_gob_session.py` — guarda sesion GetOnBrd una vez (magic link); requerido para auto-apply en GetOnBrd
 - `profile/cv.md` — perfil del candidato en español (stack, experiencia, skills)
 - `profile/cv_en.md` — perfil del candidato en INGLES (para ofertas en ingles, ej. Canonical)
@@ -78,6 +80,7 @@ El perfil esta en `profile/cv.md`. Se extraen tecnologias via regex de las secci
 - `lang="es"` (default) genera en español; `lang="en"` en ingles (para Canonical y ofertas en ingles)
 - Output: carta profesional, sin emojis, <250 palabras, con datos de contacto reales
 - Todos los datos del candidato (nombre, email, teléfono, linkedin, github, ubicacion) se extraen del `profile` dict o del `.env`. Sin fallbacks personales hardcodeados.
+- **Prompt ordenado para cache de DeepSeek (2026-06-25):** lo CONSTANTE (reglas + datos candidato + perfil) va primero, la OFERTA variable (incl. `unknown_note`, que depende del job) al FINAL. DeepSeek cachea por prefijo común → cartas del mismo idioma reusan el prefijo (~80-90% menos input). NO meter nada dependiente del job en el bloque constante o se rompe el cache.
 
 **OJO con ofertas que prohiben IA:** Canonical declara explicitamente que el uso de IA/contenido
 generado descalifica la solicitud. Para esas, el candidato debe escribir carta y respuestas con
@@ -112,19 +115,37 @@ GETONBRD_SESSION_PATH=./.gob_session.json
 
 ## Discovery Pipeline (`run_discover.py`)
 
-Pipeline de descubrimiento multi-board → filtrado → generacion de cartas. Postulacion MANUAL.
+Pipeline de descubrimiento multi-board → filtrado → match → **LISTA candidatas**. Postulacion MANUAL.
+
+**Flujo de costo optimizado (refactor 2026-06-25):** descubrir ya NO genera cartas
+por defecto (gastaba API en ~40 cartas/corrida cuando solo se usan 1-3). Ahora:
+1. **Descubrir** (0 API): lista candidatas + vuelca `output/cartas/candidates_AAAA-MM-DD.json`.
+2. **Revisar los links a mano** (lo hace el candidato).
+3. **Generar carta on-demand** SOLO para la elegida: `gen_cover.py`.
 
 ```bash
+# 1) Descubrir y listar (0 API)
 .venv/bin/python3 run_discover.py --no-apply        # todos los boards (default)
-.venv/bin/python3 run_discover.py getonbrd          # solo GetOnBrd
-.venv/bin/python3 run_discover.py himalayas         # solo Himalayas
-.venv/bin/python3 run_discover.py weworkremotely    # solo We Work Remotely
-.venv/bin/python3 run_discover.py 4dayweek          # solo 4 Day Week
-.venv/bin/python3 run_discover.py remotefirstjobs   # solo Remote First Jobs
-.venv/bin/python3 run_discover.py workingnomads     # solo Working Nomads
-.venv/bin/python3 run_discover.py linkedin          # solo LinkedIn (jobs-guest)
-.venv/bin/python3 run_discover.py hackernews        # solo Hacker News (Who is hiring)
+.venv/bin/python3 run_discover.py getonbrd          # un board (getonbrd|himalayas|
+                                                    #   weworkremotely|4dayweek|
+                                                    #   remotefirstjobs|workingnomads|
+                                                    #   linkedin|hackernews)
+.venv/bin/python3 run_discover.py --with-cover      # (opt-in) ademas genera cartas — gasta API
+
+# 2) Generar carta on-demand tras revisar el link
+.venv/bin/python3 gen_cover.py https://url-de-la-oferta            # scrapea la URL
+.venv/bin/python3 gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json          # lista para elegir
+.venv/bin/python3 gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json --pick 3 # genera la #3
+.venv/bin/python3 gen_cover.py --desc "<texto oferta>" --title T --company C  # sin scraping
 ```
+
+**Dedup entre corridas:** `run_discover.py` salta URLs en `applied_urls.txt` (con
+carta/postuladas) y en `output/seen_discovered.txt` (ya listadas antes) → cada
+corrida muestra solo lo nuevo. `gen_cover.py` marca `applied` al generar.
+
+**Import lazy de `cover`:** `run_discover.py`/`run_batch.py` solo importan el SDK
+de IA (`anthropic`) con `--with-cover`. La PC de descubrimiento puede listar sin
+tener `anthropic` instalado.
 
 **Boards activos:**
 - GetOnBrd        — ~18 cartas/corrida (LATAM, API JSON, remoto real)
@@ -213,6 +234,7 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - PENDIENTE: grabar la AI interview de Wellfound (reutilizable, asincrona ~15 min, presenta al candidato PRIMERO a las empresas y se comparte en futuras aplicaciones). Ofrecer guia de prep STAR antes de grabarla.
 - Boletin JuniorJobs (domingo) confirmado inutil para Ecuador-remoto: España/UE = exigen reubicacion/permiso UE (incluso roles "100% remoto" como Revolut Graduate 2027 que son hibridos con relocation a Poland/Portugal/Spain/UAE/UK + 3 dias oficina); LATAM = anclado a pais especifico (MX/CO/CL/AR/BR). Unico empleador global-remoto: Canonical (bloqueado hasta ~dic-2026 tras 4 rechazos + prohibe IA). NO correr el pipeline sobre las 256 ofertas (desperdicia API). Revolut Graduate 2027 (Python/Frontend): stack y timing encajan — reconsiderar SOLO si el candidato acepta reubicarse.
 - Boards agregados (2026-06-25): **LinkedIn** (`discover_linkedin`, endpoint jobs-guest sin login) y **Hacker News** (`discover_hackernews`, hilo "Who is hiring" via API Algolia). Motivo: las fuentes previas se saturan de senior/geo-restringidos; el mejor match del finde (Unumbio) lo halló el candidato a mano en LinkedIn. Probados en seco: LinkedIn ~56 crudas→10 candidatas, HN ~152→28. Integrados en `run_discover.py` (tuple `only_board` + bloques discover con `filter_global_remote`). LinkedIn: cuidado 429 (sleep 4s/página). HN: parseo heurístico (campos imperfectos, revisar `[!]`). Postulación sigue MANUAL.
+- Refactor de costo API (2026-06-25): una corrida del 23-jun gastó $0.19 generando carta para CADA candidata (~40) cuando solo se usan 1-3. Dos fixes: (A) `cover.py` reordenado para cache de prefijo de DeepSeek (constante primero, oferta al final) → ~80-90% menos input; verificado `cache_read=896` en la otra PC. (B) **desacople descubrir↔generar**: `run_discover.py` y `run_batch.py` por defecto solo LISTAN (0 API) y vuelcan `candidates_*.json`; cartas opt-in con `--with-cover`. Nuevo `gen_cover.py` genera UNA carta on-demand (`<url>`/`--desc`/`--from-json --pick`). Nuevo `src/applied.py` (tracking compartido: `applied_urls.txt` + `output/seen_discovered.txt`). Import de `cover` lazy → listar no requiere `anthropic`. `run_manual.py` NO se tocó (ahí generar es el punto). Verificado en seco: HN lista 22 candidatas, 0 API, 0 cartas. PENDIENTE confirmar `cache_read` en vivo en la PC con `anthropic`.
 
 ## Common Issues
 

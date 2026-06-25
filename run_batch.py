@@ -5,21 +5,25 @@ Parsea automáticamente los links, filtra jobs con bandera de país,
 aplica los mismos filtros que run_discover.py y genera cartas.
 
 Uso:
-  python run_batch.py boletin.txt        # desde archivo
+  python run_batch.py boletin.txt        # desde archivo (solo lista, 0 API)
   cat boletin.txt | python run_batch.py  # desde stdin (pipe)
   python run_batch.py                    # pegar texto + Ctrl+D para terminar
+  python run_batch.py boletin.txt --with-cover   # ademas genera cartas (gasta API)
 """
 
 import re
 import sys
 import os
+import json
+import datetime
 import httpx
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
-from src import profile, matcher, cover, boards
+# cover (DeepSeek/anthropic) se importa lazy mas abajo, solo con --with-cover.
+from src import profile, matcher, boards
 from src.scraper import fetch_job
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "cartas")
@@ -113,8 +117,13 @@ if __name__ == "__main__":
     print("BOLETIN JUNIORJOBS — Procesador automático")
     print("=" * 64)
 
-    if len(sys.argv) > 1:
-        filepath = sys.argv[1]
+    # Por defecto solo lista candidatas (0 API). --with-cover genera cartas.
+    with_cover = "--with-cover" in sys.argv
+    if with_cover:
+        from src import cover  # import lazy: anthropic solo si se piden cartas
+    filepath = next((a for a in sys.argv[1:] if not a.startswith("--")), None)
+
+    if filepath:
         with open(filepath, encoding="utf-8") as f:
             raw_text = f.read()
         print(f"Leyendo: {filepath}")
@@ -210,22 +219,26 @@ if __name__ == "__main__":
             print("  [x] Compatibilidad baja — omitida")
             continue
 
-        # Generar carta
-        print("  Generando carta...")
-        try:
-            carta = cover.generate(job, cv)
-        except Exception as e:
-            print(f"  [!] Error generando carta: {e}")
-            continue
-
-        # Guardar carta
-        company_slug = re.sub(r"[^a-z0-9]+", "_", (job["company"] or "empresa").lower())[:20]
-        title_slug   = re.sub(r"[^a-z0-9]+", "_", job["title"].lower())[:30]
-        slug         = f"boletin_{company_slug}_{title_slug}".strip("_")
-        out_path     = os.path.join(OUT_DIR, f"{slug}.txt")
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write(carta)
-        print(f"  Carta guardada: output/cartas/{slug}.txt")
+        # Generar carta SOLO con --with-cover (cuesta API). Default: solo listar.
+        carta = None
+        out_path = None
+        if with_cover:
+            print("  Generando carta...")
+            try:
+                carta = cover.generate(job, cv)
+            except Exception as e:
+                print(f"  [!] Error generando carta: {e}")
+                carta = None
+            if carta:
+                company_slug = re.sub(r"[^a-z0-9]+", "_", (job["company"] or "empresa").lower())[:20]
+                title_slug   = re.sub(r"[^a-z0-9]+", "_", job["title"].lower())[:30]
+                slug         = f"boletin_{company_slug}_{title_slug}".strip("_")
+                out_path     = os.path.join(OUT_DIR, f"{slug}.txt")
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write(carta)
+                print(f"  Carta guardada: output/cartas/{slug}.txt")
+        else:
+            print("  [+] Candidata listada (sin carta — gen_cover.py para generar)")
 
         results.append({"job": job, "match": match, "carta": carta, "path": out_path})
 
@@ -233,8 +246,25 @@ if __name__ == "__main__":
     # Resumen
     # -----------------------------------------------------------------------
 
+    if results:
+        cand_path = os.path.join(OUT_DIR, f"candidates_boletin_{datetime.date.today()}.json")
+        with open(cand_path, "w", encoding="utf-8") as f:
+            json.dump(
+                [{"url": r["job"]["url"], "title": r["job"]["title"],
+                  "company": r["job"].get("company", ""),
+                  "source": "juniorjobs",
+                  "location": r["job"].get("location_required", ""),
+                  "match": r["match"]["score"],
+                  "description": r["job"].get("description", "")[:3000]}
+                 for r in results],
+                f, ensure_ascii=False, indent=2,
+            )
+        print(f"\nCandidatos guardados: {cand_path}")
+        print(f"  Generá carta on-demand: python gen_cover.py --from-json {cand_path} --pick <n>")
+
     print("\n" + "=" * 64)
-    print(f"RESUMEN: {len(results)} cartas generadas de {len(junior_jobs)} candidatas")
+    _kind = "cartas generadas" if with_cover else "candidatas listadas"
+    print(f"RESUMEN: {len(results)} {_kind} de {len(junior_jobs)} candidatas")
     print()
 
     if results:

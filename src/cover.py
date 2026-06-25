@@ -90,7 +90,6 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
             "- Use the candidate's real data, do NOT use placeholders or brackets\n"
             "- Real contact details at the end of the letter\n"
             + _HONESTY_RULES_EN
-            + unknown_note
             + "\n"
         )
         closing = (
@@ -109,7 +108,6 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
             "- Usa los datos reales del candidato, NO uses placeholders ni corchetes\n"
             "- Datos de contacto reales al final de la carta\n"
             + _HONESTY_RULES_ES
-            + unknown_note
             + "\n"
         )
         closing = (
@@ -118,26 +116,33 @@ def generate(job: dict, profile: dict, lang: str = "es") -> str:
             "incluyendo URL del portafolio."
         )
 
+    # Bloque CONSTANTE primero (reglas + datos candidato + perfil): identico en
+    # todas las cartas del mismo idioma -> prefijo cacheable por DeepSeek.
+    # La oferta variable (incl. unknown_note, que depende del job) va al FINAL
+    # para no romper el cache del prefijo.
+    constant_prefix = (
+        intro
+        + f"**Nombre candidato:** {nombre}\n"
+        f"**Email:** {email}\n"
+        f"**Telefono:** {telefono}\n"
+        f"**LinkedIn:** {linkedin}\n"
+        f"**GitHub:** {github}\n"
+        f"**Portfolio:** {portfolio}\n"
+        f"**Ubicacion:** {ubicacion}\n"
+        f"**Perfil completo:** {raw}\n\n"
+        + closing
+        + "\n\n"
+    )
+    job_suffix = (
+        "--- OFERTA A LA QUE POSTULAR ---\n"
+        f"**Oferta:** {job.get('title', '')} en {job.get('company', '')}\n"
+        f"**Descripcion:** {job.get('description', '')[:2000]}\n"
+        + unknown_note
+    )
     resp = client.messages.create(
         model="deepseek-chat",
         max_tokens=800,
-        messages=[{
-            "role": "user",
-            "content": (
-                intro
-                + f"**Oferta:** {job.get('title', '')} en {job.get('company', '')}\n"
-                f"**Descripcion:** {job.get('description', '')[:2000]}\n"
-                f"**Nombre candidato:** {nombre}\n"
-                f"**Email:** {email}\n"
-                f"**Telefono:** {telefono}\n"
-                f"**LinkedIn:** {linkedin}\n"
-                f"**GitHub:** {github}\n"
-                f"**Portfolio:** {portfolio}\n"
-                f"**Ubicacion:** {ubicacion}\n"
-                f"**Perfil completo:** {raw}\n\n"
-                + closing
-            ),
-        }],
+        messages=[{"role": "user", "content": constant_prefix + job_suffix}],
     )
     return resp.content[0].text
 

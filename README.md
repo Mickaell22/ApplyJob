@@ -37,7 +37,7 @@ ApplyJob/
 │   ├── cv_en.pdf        # CV en PDF (ingles)        ← CV_PATH_EN en .env
 │   └── cv_template.md   # plantilla de perfil para nuevos usuarios
 ├── src/
-│   ├── boards.py        # descubre ofertas desde 6+ tableros remotos
+│   ├── boards.py        # descubre ofertas desde 8+ tableros remotos
 │   ├── scraper.py       # extrae informacion de ofertas desde URLs
 │   ├── profile.py       # carga y parsea el CV/perfil
 │   ├── matcher.py       # calcula compatibilidad oferta vs perfil
@@ -140,19 +140,29 @@ CANDIDATE_REGION=LATAM
 
 ## Discovery Pipeline
 
-`run_discover.py` descubre ofertas de múltiples tableros, las filtra y genera cartas automáticamente.
+`run_discover.py` descubre ofertas de múltiples tableros, las filtra y **lista las
+candidatas sin gastar API** (vuelca un JSON). Tú revisas los links y generas la
+carta solo para la que vas a postular, con `gen_cover.py`. Esto evita generar ~40
+cartas por corrida cuando solo usas 1-3.
 
 ```bash
-# Todos los boards
-python run_discover.py --no-apply
-
-# Un board específico
-python run_discover.py getonbrd
-python run_discover.py himalayas
-python run_discover.py weworkremotely
-python run_discover.py 4dayweek
+# 1) Descubrir y listar (0 API)
+python run_discover.py --no-apply          # todos los boards
+python run_discover.py getonbrd            # un board específico:
+python run_discover.py himalayas           #   getonbrd | himalayas | weworkremotely
+python run_discover.py weworkremotely      #   4dayweek | remotefirstjobs | workingnomads
+python run_discover.py 4dayweek            #   linkedin | hackernews
 python run_discover.py remotefirstjobs
 python run_discover.py workingnomads
+python run_discover.py linkedin
+python run_discover.py hackernews
+python run_discover.py --with-cover        # (opt-in) además genera cartas — gasta API
+
+# 2) Generar carta on-demand tras revisar el link (lo único que gasta API)
+python gen_cover.py https://url-de-la-oferta                       # scrapea la URL
+python gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json           # lista para elegir
+python gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json --pick 3  # genera la #3
+python gen_cover.py --desc "<texto de la oferta>" --title T --company C  # sin scraping
 ```
 
 **Boards soportados:**
@@ -165,6 +175,8 @@ python run_discover.py workingnomads
 | 4 Day Week | API JSON | `level=entry,mid` en API |
 | Remote First Jobs | API JSON | `entry_level/middle/intern` |
 | Working Nomads | API JSON | Manual (título) |
+| LinkedIn | HTML (jobs-guest, sin login) | `f_E=1,2` (Internship+Entry) en endpoint |
+| Hacker News | API Algolia (Who is hiring) | Manual (título) |
 
 **Filtros en cascada:**
 1. Keywords técnicas en título (`TECH_FILTER`)
