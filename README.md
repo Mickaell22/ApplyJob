@@ -156,8 +156,12 @@ python run_discover.py remotefirstjobs
 python run_discover.py workingnomads
 python run_discover.py linkedin
 python run_discover.py hackernews
-python run_discover.py linkedin-local      # canal LOCAL: pais del candidato
-                                           #   (CANDIDATE_COUNTRY), sin geo-filtro
+python run_discover.py linkedin-local      # canal LOCAL: LinkedIn en el pais del
+                                           #   candidato (CANDIDATE_COUNTRY)
+python run_discover.py computrabajo        # canal LOCAL: Computrabajo (COMPUTRABAJO_DOMAIN)
+python run_discover.py multitrabajos       # canal LOCAL: Multitrabajos Ecuador (Playwright)
+python run_discover.py local               # los 3 boards del canal local juntos
+python run_discover.py --verify            # descartar ofertas expiradas (request extra c/u)
 python run_discover.py --with-cover        # (opt-in) además genera cartas — gasta API
 
 # 2) Generar carta on-demand tras revisar el link (lo único que gasta API)
@@ -186,6 +190,8 @@ decide `Apply/Consider/Research/Skip`. Con `Skip` no se genera carta
 | LinkedIn | HTML (jobs-guest, sin login) | `f_E=1,2` (Internship+Entry) en endpoint |
 | Hacker News | API Algolia (Who is hiring) | Manual (título) |
 | LinkedIn LOCAL | HTML (jobs-guest, sin login) | `f_E=1,2`; busca en `CANDIDATE_COUNTRY`, acepta presencial/híbrido (`canal: local`) |
+| Computrabajo | HTML server-rendered | Manual (título + "3+ años"); `canal: local`, subdominio via `COMPUTRABAJO_DOMAIN` |
+| Multitrabajos | Playwright (SPA Bumeran, Ecuador) | Manual (título + "3+ años"); `canal: local` |
 
 **Filtros en cascada:**
 1. Keywords técnicas en título (`TECH_FILTER`)

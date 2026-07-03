@@ -29,7 +29,11 @@ Uso:
   python run_discover.py remotefirstjobs # solo Remote First Jobs
   python run_discover.py workingnomads  # solo Working Nomads
   python run_discover.py remotive       # solo Remotive
-  python run_discover.py linkedin-local # solo canal local (pais del candidato)
+  python run_discover.py linkedin-local # solo LinkedIn local (pais del candidato)
+  python run_discover.py computrabajo   # solo Computrabajo (COMPUTRABAJO_DOMAIN)
+  python run_discover.py multitrabajos  # solo Multitrabajos (Ecuador, Playwright)
+  python run_discover.py local          # los 3 boards del canal local juntos
+  python run_discover.py --verify       # descartar ofertas expiradas (request extra c/u)
   python run_discover.py --no-remote    # incluir presenciales
 """
 
@@ -63,11 +67,13 @@ args = sys.argv[1:]
 only_board  = next((a for a in args if a in (
     "getonbrd", "himalayas", "weworkremotely", "4dayweek",
     "remotefirstjobs", "workingnomads", "remotive", "glovo", "wellfound",
-    "linkedin", "hackernews", "linkedin-local",
+    "linkedin", "hackernews", "linkedin-local", "computrabajo",
+    "multitrabajos", "local",
 )), None)
 remote_only = "--no-remote" not in args
 dry_run     = "--dry-run" in args
 no_apply    = "--no-apply" in args
+verify      = "--verify" in args  # confirma con una request extra que la oferta siga viva
 # Por defecto NO se generan cartas (cuesta API DeepSeek y el ~95% nunca se usa).
 # Descubrir lista candidatas gratis -> revisar links -> generar on-demand con
 # gen_cover.py. --with-cover fuerza el comportamiento viejo (carta para todas).
@@ -146,12 +152,24 @@ if not only_board or only_board == "hackernews":
     print(f"  {len(hn_jobs)} ofertas → {len(hn_global)} accesibles desde Ecuador")
     discovered.extend(hn_global)
 
-if not only_board or only_board == "linkedin-local":
+# Canal local: sin filter_global_remote — el pais del candidato es valido
+if not only_board or only_board in ("linkedin-local", "local"):
     print("\nLinkedIn LOCAL (canal pais del candidato)...")
     lil_jobs = boards.discover_linkedin_local()
     print(f"  {len(lil_jobs)} ofertas encontradas")
-    # Canal local: sin filter_global_remote — el pais del candidato es valido
     discovered.extend(lil_jobs)
+
+if not only_board or only_board in ("computrabajo", "local"):
+    print("\nComputrabajo (canal local)...")
+    ct_jobs = boards.discover_computrabajo()
+    print(f"  {len(ct_jobs)} ofertas encontradas")
+    discovered.extend(ct_jobs)
+
+if not only_board or only_board in ("multitrabajos", "local"):
+    print("\nMultitrabajos (canal local, Playwright)...")
+    mt_jobs = boards.discover_multitrabajos()
+    print(f"  {len(mt_jobs)} ofertas encontradas")
+    discovered.extend(mt_jobs)
 
 if not only_board or only_board == "wellfound":
     print("\nWellfound (wellfound.com)...")
@@ -253,6 +271,12 @@ for job in clean_jobs:
         print("  [x] Compatibilidad baja — omitida")
         continue
 
+    # Verificacion opcional de vigencia (request extra por candidata)
+    # NO se marca como vista si esta muerta: un falso positivo puede reaparecer
+    if verify and boards.is_job_dead(job["url"]):
+        print("  [x] Oferta expirada/cerrada (--verify) — omitida")
+        continue
+
     # Candidata valida → marcar como vista para no re-listarla mañana
     applied.mark_seen(job["url"])
     seen_urls.add(job["url"])
@@ -292,18 +316,23 @@ for job in clean_jobs:
 # ---------------------------------------------------------------------------
 if results:
     cand_path = os.path.join(OUT_DIR, f"candidates_{datetime.date.today()}.json")
+    new_cands = [{"url": r["job"]["url"], "title": r["job"]["title"],
+                  "company": r["job"].get("company", ""),
+                  "source": r["job"]["source"],
+                  "canal": r["job"].get("canal", "remoto"),
+                  "location": r["job"].get("location_required", ""),
+                  "match": r["match"]["score"],
+                  "description": r["job"].get("description", "")[:3000]}
+                 for r in results]
+    # Merge con corridas previas del mismo dia (ej. un board y luego otro):
+    # sin esto, cada corrida sobrescribia el JSON y perdia las anteriores
+    if os.path.exists(cand_path):
+        with open(cand_path, encoding="utf-8") as f:
+            old = json.load(f)
+        new_urls = {c["url"] for c in new_cands}
+        new_cands = [c for c in old if c["url"] not in new_urls] + new_cands
     with open(cand_path, "w", encoding="utf-8") as f:
-        json.dump(
-            [{"url": r["job"]["url"], "title": r["job"]["title"],
-              "company": r["job"].get("company", ""),
-              "source": r["job"]["source"],
-              "canal": r["job"].get("canal", "remoto"),
-              "location": r["job"].get("location_required", ""),
-              "match": r["match"]["score"],
-              "description": r["job"].get("description", "")[:3000]}
-             for r in results],
-            f, ensure_ascii=False, indent=2,
-        )
+        json.dump(new_cands, f, ensure_ascii=False, indent=2)
     api_tag = "con API (cartas generadas)" if with_cover else "0 API (solo listado)"
     print(f"\nCandidatos guardados: {cand_path}  ({len(results)} ofertas, {api_tag})")
     print(f"  Generá carta on-demand: python gen_cover.py --from-json {cand_path} --pick <n>")
