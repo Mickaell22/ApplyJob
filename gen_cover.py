@@ -10,6 +10,11 @@ Uso:
   python gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json
                                                                  # lista para elegir
   python gen_cover.py --from-json <archivo.json> --pick <n|url> [--lang en]
+
+Antes de generar corre una evaluacion (src/evaluator.py): reglas duras 0 API
+(senior, 3+ años, prohibe IA, pais incompatible) y si pasan, DeepSeek puntua
+CV vs oferta y decide Apply/Consider/Research/Skip. Con Skip no se genera
+carta (--force para forzar; --no-eval para saltar la evaluacion).
 """
 import sys
 import os
@@ -34,6 +39,10 @@ ap.add_argument("--company", default="")
 ap.add_argument("--from-json", dest="from_json")
 ap.add_argument("--pick", help="indice (0-based) o URL dentro del JSON de candidatos")
 ap.add_argument("--lang", default="es")
+ap.add_argument("--no-eval", action="store_true",
+                help="saltar la evaluacion previa (reglas duras + DeepSeek)")
+ap.add_argument("--force", action="store_true",
+                help="generar la carta aunque la evaluacion diga Skip")
 a = ap.parse_args()
 
 if a.from_json:
@@ -51,7 +60,9 @@ if a.from_json:
         if not c:
             sys.exit(f"no encontré la URL {a.pick} en {a.from_json}")
     job = {"title": c.get("title", ""), "company": c.get("company", ""),
-           "description": c.get("description", ""), "url": c.get("url", "")}
+           "description": c.get("description", ""), "url": c.get("url", ""),
+           "location_required": c.get("location", ""),
+           "canal": c.get("canal", "remoto")}
 elif a.desc:
     job = {"title": a.title, "company": a.company, "description": a.desc, "url": ""}
 elif a.url:
@@ -70,6 +81,25 @@ if not job.get("description"):
 cv = profile.load()
 if "error" in cv:
     sys.exit(f"error cargando CV: {cv['error']}")
+
+# Evaluacion previa: reglas duras (0 API) y, si pasan, DeepSeek razona CV vs
+# oferta. Solo aca — nunca sobre el batch de descubrimiento.
+if not a.no_eval:
+    from src import evaluator
+    ev = evaluator.evaluate_with_overrides(job, cv)
+    print(f"Evaluacion: {ev.get('decision')}"
+          + (f"  (promedio {ev['promedio']}/5)" if ev.get("promedio") is not None else ""))
+    for k in ("match_cv", "nivel_fit", "remoto_real", "comp", "global"):
+        if ev.get(k) is not None:
+            print(f"  {k:12}: {ev[k]}")
+    if ev.get("red_flags"):
+        print("  red flags  : " + "; ".join(str(f) for f in ev["red_flags"]))
+    if ev.get("threshold_warning"):
+        print(f"  [!] {ev['threshold_warning']}")
+    if ev.get("razon"):
+        print(f"  razon      : {ev['razon']}")
+    if ev.get("decision") == "Skip" and not a.force:
+        sys.exit("decision=Skip — no genero carta (usa --force para generar igual)")
 
 from src import cover  # import lazy: anthropic solo al momento de generar
 carta = cover.generate(job, cv, lang=a.lang)

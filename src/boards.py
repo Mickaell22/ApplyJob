@@ -895,6 +895,7 @@ def discover_linkedin(
     keywords: list[str] | None = None,
     remote_only: bool = True,
     max_pages: int = 3,
+    location: str = "Worldwide",
 ) -> list[dict]:
     """Descubre ofertas en LinkedIn via el endpoint guest (sin auth).
 
@@ -915,7 +916,7 @@ def discover_linkedin(
         for page in range(max_pages):
             params = {
                 "keywords": kw,
-                "location": "Worldwide",
+                "location": location,
                 "f_E": "1,2",            # 1=Internship, 2=Entry level
                 "f_TPR": "r604800",      # publicado en la última semana
                 "start": page * 10,
@@ -966,6 +967,31 @@ def discover_linkedin(
 
             time.sleep(4)  # ponytail: ir lento para no comerse un 429
 
+    return jobs
+
+
+def discover_linkedin_local(max_pages: int = 2) -> list[dict]:
+    """Canal LOCAL: ofertas en el pais del candidato (presencial/hibrido/remoto-pais).
+
+    Reusa discover_linkedin() cambiando location al pais del candidato
+    (CANDIDATE_COUNTRY del .env) y quitando el filtro remoto f_WT=2. Mantiene
+    f_E=1,2 (Internship+Entry). Los jobs salen con canal="local" para que el
+    pipeline NO les aplique el geo-filtro remoto-global.
+
+    ponytail: se busca por pais entero, no por ciudad — capta remoto-dentro-del-
+    pais (valioso) a costa de ruido presencial de otras ciudades; el campo
+    location queda visible para descartarlo a mano.
+    """
+    country = os.getenv("CANDIDATE_COUNTRY", "").strip()
+    location = country or os.getenv("CANDIDATE_LOCATION", "").strip()
+    if not location:
+        print("  [!] Sin CANDIDATE_COUNTRY/CANDIDATE_LOCATION en .env — canal local omitido")
+        return []
+
+    jobs = discover_linkedin(remote_only=False, max_pages=max_pages, location=location)
+    for j in jobs:
+        j["source"] = "linkedin-local"
+        j["canal"] = "local"
     return jobs
 
 

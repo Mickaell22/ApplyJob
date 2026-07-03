@@ -156,6 +156,8 @@ python run_discover.py remotefirstjobs
 python run_discover.py workingnomads
 python run_discover.py linkedin
 python run_discover.py hackernews
+python run_discover.py linkedin-local      # canal LOCAL: pais del candidato
+                                           #   (CANDIDATE_COUNTRY), sin geo-filtro
 python run_discover.py --with-cover        # (opt-in) además genera cartas — gasta API
 
 # 2) Generar carta on-demand tras revisar el link (lo único que gasta API)
@@ -164,6 +166,12 @@ python gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json        
 python gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json --pick 3  # genera la #3
 python gen_cover.py --desc "<texto de la oferta>" --title T --company C  # sin scraping
 ```
+
+Antes de generar, `gen_cover.py` evalúa la oferta (`src/evaluator.py`): reglas
+duras sin API (título senior, "3+ años", prohíbe IA, país incompatible) y, si
+pasan, DeepSeek puntúa CV vs oferta (match, nivel, remoto, comp, global) y
+decide `Apply/Consider/Research/Skip`. Con `Skip` no se genera carta
+(`--force` para forzar, `--no-eval` para saltarla).
 
 **Boards soportados:**
 
@@ -177,6 +185,7 @@ python gen_cover.py --desc "<texto de la oferta>" --title T --company C  # sin s
 | Working Nomads | API JSON | Manual (título) |
 | LinkedIn | HTML (jobs-guest, sin login) | `f_E=1,2` (Internship+Entry) en endpoint |
 | Hacker News | API Algolia (Who is hiring) | Manual (título) |
+| LinkedIn LOCAL | HTML (jobs-guest, sin login) | `f_E=1,2`; busca en `CANDIDATE_COUNTRY`, acepta presencial/híbrido (`canal: local`) |
 
 **Filtros en cascada:**
 1. Keywords técnicas en título (`TECH_FILTER`)

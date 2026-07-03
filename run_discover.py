@@ -9,12 +9,15 @@ Boards:
   - Remote First Jobs(remotefirstjobs.com)  — API JSON, entry-level, global
   - Working Nomads  (workingnomads.com)     — API JSON, global, 100% remoto
   - Remotive        (remotive.com)          — API JSON (limitada a ~28 jobs)
+  - LinkedIn LOCAL  (linkedin-local)        — canal local: jobs en el pais del
+    candidato (CANDIDATE_COUNTRY), presencial/hibrido/remoto-pais, canal="local"
 
 Filtros aplicados automaticamente:
   1. Solo keywords técnicas (python, backend, fullstack, react, etc.)
   2. Sin senior/lead/architect en el título
   3. Sin "3+ años de experiencia" en la descripción
-  4. Sin restricción de país que excluya Ecuador
+  4. Sin restricción de país que excluya Ecuador (solo canal remoto;
+     el canal local no pasa por el geo-filtro)
 
 Uso:
   python run_discover.py                # todos los boards + genera cartas
@@ -26,6 +29,7 @@ Uso:
   python run_discover.py remotefirstjobs # solo Remote First Jobs
   python run_discover.py workingnomads  # solo Working Nomads
   python run_discover.py remotive       # solo Remotive
+  python run_discover.py linkedin-local # solo canal local (pais del candidato)
   python run_discover.py --no-remote    # incluir presenciales
 """
 
@@ -59,7 +63,7 @@ args = sys.argv[1:]
 only_board  = next((a for a in args if a in (
     "getonbrd", "himalayas", "weworkremotely", "4dayweek",
     "remotefirstjobs", "workingnomads", "remotive", "glovo", "wellfound",
-    "linkedin", "hackernews",
+    "linkedin", "hackernews", "linkedin-local",
 )), None)
 remote_only = "--no-remote" not in args
 dry_run     = "--dry-run" in args
@@ -141,6 +145,13 @@ if not only_board or only_board == "hackernews":
     hn_global = boards.filter_global_remote(hn_jobs)
     print(f"  {len(hn_jobs)} ofertas → {len(hn_global)} accesibles desde Ecuador")
     discovered.extend(hn_global)
+
+if not only_board or only_board == "linkedin-local":
+    print("\nLinkedIn LOCAL (canal pais del candidato)...")
+    lil_jobs = boards.discover_linkedin_local()
+    print(f"  {len(lil_jobs)} ofertas encontradas")
+    # Canal local: sin filter_global_remote — el pais del candidato es valido
+    discovered.extend(lil_jobs)
 
 if not only_board or only_board == "wellfound":
     print("\nWellfound (wellfound.com)...")
@@ -230,7 +241,8 @@ for job in clean_jobs:
     # Verificar remote si no vino del listing
     if job.get("remote") is None:
         job["remote"] = bool(boards.REMOTE_FILTER.search(job["description"]))
-    if remote_only and job.get("remote") is False:
+    # Canal local: presencial/hibrido en el pais del candidato es valido
+    if remote_only and job.get("remote") is False and job.get("canal") != "local":
         print("  [x] No es remoto — omitida")
         continue
 
@@ -285,6 +297,7 @@ if results:
             [{"url": r["job"]["url"], "title": r["job"]["title"],
               "company": r["job"].get("company", ""),
               "source": r["job"]["source"],
+              "canal": r["job"].get("canal", "remoto"),
               "location": r["job"].get("location_required", ""),
               "match": r["match"]["score"],
               "description": r["job"].get("description", "")[:3000]}
@@ -395,7 +408,10 @@ _kind = "cartas" if with_cover else "candidatas listadas"
 print(f"RESUMEN: {len(results)} {_kind} / {len(junior_jobs)} candidatas procesadas")
 for r in results:
     j = r["job"]
-    remote_tag = "REMOTO" if j.get("remote") else "presencial"
+    if j.get("canal") == "local":
+        remote_tag = "LOCAL"
+    else:
+        remote_tag = "REMOTO" if j.get("remote") else "presencial"
     company    = str(j.get("company") or "?")
     loc        = j.get("location_required", "")
     loc_tag    = f" [{loc}]" if loc and loc.lower() not in ("worldwide", "") else ""
