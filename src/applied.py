@@ -1,6 +1,6 @@
 """Persistencia simple de URLs vistas/postuladas (txt, una URL por linea).
 
-Compartido por run_discover.py (descubrir/listar) y gen_cover.py (generar carta),
+Compartido por cli/run_discover.py (descubrir/listar) y cli/gen_cover.py (generar carta),
 para no duplicar la logica de tracking.
 
 - applied_urls.txt          : URLs con carta generada o postulacion real -> nunca re-listar.

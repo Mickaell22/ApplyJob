@@ -41,7 +41,7 @@ print("  1. Se abre el browser en el login de LinkedIn.")
 print("  2. Logueate normalmente (email + password + 2FA/captcha si aparece).")
 print("  3. Cuando veas tu feed/inicio, volve aca y presiona ENTER.")
 print("  4. La sesion se guarda y ya podes correr:")
-print("        .venv/bin/python3 run_discover.py linkedin-auth --no-apply")
+print("        .venv/bin/python3 cli/run_discover.py linkedin-auth --no-apply")
 print()
 input("Presiona ENTER para abrir el browser...")
 
@@ -93,5 +93,5 @@ with sync_playwright() as p:
     browser.close()
 
 print("\nListo. Ahora corre:")
-print("  .venv/bin/python3 run_discover.py linkedin-auth --no-apply")
+print("  .venv/bin/python3 cli/run_discover.py linkedin-auth --no-apply")
 print()

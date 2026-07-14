@@ -1,6 +1,6 @@
 """Evaluacion on-demand de UNA oferta vs el perfil: reglas duras + DeepSeek.
 
-Se usa SOLO desde gen_cover.py para las 1-3 ofertas finalistas — nunca sobre el
+Se usa SOLO desde cli/gen_cover.py para las 1-3 ofertas finalistas — nunca sobre el
 batch completo de descubrimiento (romperia la optimizacion de costo del 25-jun).
 
 Flujo:

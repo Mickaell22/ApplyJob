@@ -2,14 +2,14 @@
 """Genera UNA carta on-demand tras revisar el link manualmente.
 
 Solo gasta API DeepSeek para la oferta que decidís postular (no para las ~40
-candidatas). Complementa a run_discover.py, que ahora solo lista (0 API).
+candidatas). Complementa a cli/run_discover.py, que ahora solo lista (0 API).
 
 Uso:
-  python gen_cover.py <url> [--lang en]                         # scrapea la URL
-  python gen_cover.py --desc "<texto>" --title T --company C [--lang en]
-  python gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json
+  python cli/gen_cover.py <url> [--lang en]                         # scrapea la URL
+  python cli/gen_cover.py --desc "<texto>" --title T --company C [--lang en]
+  python cli/gen_cover.py --from-json output/cartas/candidates_AAAA-MM-DD.json
                                                                  # lista para elegir
-  python gen_cover.py --from-json <archivo.json> --pick <n|url> [--lang en]
+  python cli/gen_cover.py --from-json <archivo.json> --pick <n|url> [--lang en]
 
 Antes de generar corre una evaluacion (src/evaluator.py): reglas duras 0 API
 (senior, 3+ años, prohibe IA, pais incompatible) y si pasan, DeepSeek puntua

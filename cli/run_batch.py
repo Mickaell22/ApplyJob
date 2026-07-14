@@ -2,13 +2,13 @@
 """Procesa el boletín de JuniorJobs desde texto plano.
 
 Parsea automáticamente los links, filtra jobs con bandera de país,
-aplica los mismos filtros que run_discover.py y genera cartas.
+aplica los mismos filtros que cli/run_discover.py y genera cartas.
 
 Uso:
-  python run_batch.py boletin.txt        # desde archivo (solo lista, 0 API)
-  cat boletin.txt | python run_batch.py  # desde stdin (pipe)
-  python run_batch.py                    # pegar texto + Ctrl+D para terminar
-  python run_batch.py boletin.txt --with-cover   # ademas genera cartas (gasta API)
+  python cli/run_batch.py boletin.txt        # desde archivo (solo lista, 0 API)
+  cat boletin.txt | python cli/run_batch.py  # desde stdin (pipe)
+  python cli/run_batch.py                    # pegar texto + Ctrl+D para terminar
+  python cli/run_batch.py boletin.txt --with-cover   # ademas genera cartas (gasta API)
 """
 
 import re
@@ -238,7 +238,7 @@ if __name__ == "__main__":
                     f.write(carta)
                 print(f"  Carta guardada: output/cartas/{slug}.txt")
         else:
-            print("  [+] Candidata listada (sin carta — gen_cover.py para generar)")
+            print("  [+] Candidata listada (sin carta — cli/gen_cover.py para generar)")
 
         results.append({"job": job, "match": match, "carta": carta, "path": out_path})
 
@@ -260,7 +260,7 @@ if __name__ == "__main__":
                 f, ensure_ascii=False, indent=2,
             )
         print(f"\nCandidatos guardados: {cand_path}")
-        print(f"  Generá carta on-demand: python gen_cover.py --from-json {cand_path} --pick <n>")
+        print(f"  Generá carta on-demand: python cli/gen_cover.py --from-json {cand_path} --pick <n>")
 
     print("\n" + "=" * 64)
     _kind = "cartas generadas" if with_cover else "candidatas listadas"

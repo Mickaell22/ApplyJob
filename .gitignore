@@ -2,11 +2,11 @@
 __pycache__/
 *.pyc
 .venv/
-profile/cv.md
+# Todo .md de profile/ es personal (CV, prep de entrevistas, scripts, tracker) — NO versionar.
+# Excepción: la plantilla sin PII.
+profile/*.md
+!profile/cv_template.md
 profile/getonboard_bio.txt
-profile/postulaciones.md
-profile/story_bank.md
-profile/cv_en.md
 profile/cv.pdf
 profile/CV_*.pdf
 *.pdf
@@ -14,6 +14,9 @@ profile/CV_*.pdf
 !profile/cv_en.pdf
 !profile/cv_es.docx
 !profile/cv_en.docx
+
+# Automatización local de esta máquina (timer systemd 7 AM) — no versionar
+daily_digest.py
 
 # Cartas generadas — contienen datos de contacto reales (PII), no versionar
 output/cartas/

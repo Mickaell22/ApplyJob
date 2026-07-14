@@ -3,8 +3,8 @@
 ApplyJob — Automatizacion de postulaciones laborales.
 
 Modo CLI:
-    python main.py <url1> <url2> ...
-    echo "url1 url2" | python main.py
+    python cli/main.py <url1> <url2> ...
+    echo "url1 url2" | python cli/main.py
 
 Modo integracion (desde el agente):
     from src import scraper, profile, matcher, cover, sender
@@ -89,7 +89,7 @@ def _guess_hr_email(job: dict) -> str | None:
 def main():
     urls = sys.argv[1:] or sys.stdin.read().strip().split()
     if not urls:
-        print("Uso: python main.py <url1> <url2> ...")
+        print("Uso: python cli/main.py <url1> <url2> ...")
         sys.exit(1)
     run(urls)
 

@@ -139,12 +139,16 @@ def discover_linkedin_local(max_pages: int = 2) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# LinkedIn AUTENTICADO — sesion guardada (setup_linkedin_session.py) + Playwright
+# LinkedIn AUTENTICADO — sesion guardada (scripts/setup_linkedin_session.py) + Playwright
 # ---------------------------------------------------------------------------
 
 _LINKEDIN_SESSION_PATH = os.getenv(
     "LINKEDIN_SESSION_PATH",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".linkedin_session.json"),
+    # src/boards/linkedin.py → boards → src → raíz del proyecto (3 niveles).
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        ".linkedin_session.json",
+    ),
 )
 _LINKEDIN_AUTH_SEARCH = "https://www.linkedin.com/jobs/search/"
 
@@ -159,10 +163,10 @@ def discover_linkedin_auth(
 
     A diferencia de discover_linkedin() (endpoint guest, muy limitado y con
     rate-limit 429 agresivo), esto reusa la cookie de sesion guardada por
-    setup_linkedin_session.py: LinkedIn logueado devuelve mas resultados y sin
+    scripts/setup_linkedin_session.py: LinkedIn logueado devuelve mas resultados y sin
     el bloqueo del guest. Se renderiza con Playwright (SPA) y se parsea el DOM.
 
-    Requiere correr ANTES `setup_linkedin_session.py` una vez (abre el browser,
+    Requiere correr ANTES `scripts/setup_linkedin_session.py` una vez (abre el browser,
     te logueas a mano —incluido 2FA/captcha— y se guarda la sesion). Si no hay
     sesion guardada, devuelve [] con un aviso.
 
@@ -171,7 +175,7 @@ def discover_linkedin_auth(
     upgrade = interceptar el XHR voyager (page.on("response")) en vez del DOM.
     """
     if not os.path.exists(_LINKEDIN_SESSION_PATH):
-        print("  [!] Sin sesion LinkedIn — corre primero: python3 setup_linkedin_session.py")
+        print("  [!] Sin sesion LinkedIn — corre primero: python3 scripts/setup_linkedin_session.py")
         return []
     try:
         from playwright.sync_api import sync_playwright
@@ -217,7 +221,7 @@ def discover_linkedin_auth(
                         page.goto(url, wait_until="domcontentloaded", timeout=30000)
                         # Si la sesion caduco, LinkedIn redirige a login/checkpoint
                         if any(x in page.url for x in ("/login", "/checkpoint", "/authwall")):
-                            print("  [!] Sesion LinkedIn caducada — recorre setup_linkedin_session.py")
+                            print("  [!] Sesion LinkedIn caducada — recorre scripts/setup_linkedin_session.py")
                             browser.close()
                             return jobs
                         page.wait_for_timeout(3500)

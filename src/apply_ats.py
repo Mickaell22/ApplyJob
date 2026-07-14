@@ -394,13 +394,13 @@ def apply_getonbrd(context, url: str, cover_letter: str, cv_abs_path: str, dry_r
 
     Nota: GetOnBrd auto-crea un draft al navegar a /applications/new.
     Para drafts existentes (/edit) se salta directamente al step 2.
-    Requiere haber corrido `setup_gob_session.py` al menos una vez.
+    Requiere haber corrido `scripts/setup_gob_session.py` al menos una vez.
     """
     if not os.path.exists(_GOB_SESSION):
         return {
             "error": (
                 "Sesión de GetOnBrd no encontrada. "
-                "Corre `python setup_gob_session.py` para guardarla."
+                "Corre `python scripts/setup_gob_session.py` para guardarla."
             )
         }
 
@@ -411,7 +411,7 @@ def apply_getonbrd(context, url: str, cover_letter: str, cv_abs_path: str, dry_r
 
     if "/login" in page.url or "/auth" in page.url:
         page.close()
-        return {"error": "Sesión GetOnBrd expirada — corre setup_gob_session.py de nuevo"}
+        return {"error": "Sesión GetOnBrd expirada — corre scripts/setup_gob_session.py de nuevo"}
 
     # Aceptar cookies
     cookie_btn = page.query_selector("#accept_cookies button")

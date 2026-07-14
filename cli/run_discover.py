@@ -20,21 +20,21 @@ Filtros aplicados automaticamente:
      el canal local no pasa por el geo-filtro)
 
 Uso:
-  python run_discover.py                # todos los boards + genera cartas
-  python run_discover.py --no-apply     # igual (modo default, sin auto-apply)
-  python run_discover.py getonbrd       # solo GetOnBrd
-  python run_discover.py himalayas      # solo Himalayas
-  python run_discover.py weworkremotely # solo We Work Remotely
-  python run_discover.py 4dayweek       # solo 4 Day Week
-  python run_discover.py remotefirstjobs # solo Remote First Jobs
-  python run_discover.py workingnomads  # solo Working Nomads
-  python run_discover.py remotive       # solo Remotive
-  python run_discover.py linkedin-local # solo LinkedIn local (pais del candidato)
-  python run_discover.py computrabajo   # solo Computrabajo (COMPUTRABAJO_DOMAIN)
-  python run_discover.py multitrabajos  # solo Multitrabajos (Ecuador, Playwright)
-  python run_discover.py local          # los 3 boards del canal local juntos
-  python run_discover.py --verify       # descartar ofertas expiradas (request extra c/u)
-  python run_discover.py --no-remote    # incluir presenciales
+  python cli/run_discover.py                # todos los boards + genera cartas
+  python cli/run_discover.py --no-apply     # igual (modo default, sin auto-apply)
+  python cli/run_discover.py getonbrd       # solo GetOnBrd
+  python cli/run_discover.py himalayas      # solo Himalayas
+  python cli/run_discover.py weworkremotely # solo We Work Remotely
+  python cli/run_discover.py 4dayweek       # solo 4 Day Week
+  python cli/run_discover.py remotefirstjobs # solo Remote First Jobs
+  python cli/run_discover.py workingnomads  # solo Working Nomads
+  python cli/run_discover.py remotive       # solo Remotive
+  python cli/run_discover.py linkedin-local # solo LinkedIn local (pais del candidato)
+  python cli/run_discover.py computrabajo   # solo Computrabajo (COMPUTRABAJO_DOMAIN)
+  python cli/run_discover.py multitrabajos  # solo Multitrabajos (Ecuador, Playwright)
+  python cli/run_discover.py local          # los 3 boards del canal local juntos
+  python cli/run_discover.py --verify       # descartar ofertas expiradas (request extra c/u)
+  python cli/run_discover.py --no-remote    # incluir presenciales
 """
 
 import re
@@ -76,7 +76,7 @@ no_apply    = "--no-apply" in args
 verify      = "--verify" in args  # confirma con una request extra que la oferta siga viva
 # Por defecto NO se generan cartas (cuesta API DeepSeek y el ~95% nunca se usa).
 # Descubrir lista candidatas gratis -> revisar links -> generar on-demand con
-# gen_cover.py. --with-cover fuerza el comportamiento viejo (carta para todas).
+# cli/gen_cover.py. --with-cover fuerza el comportamiento viejo (carta para todas).
 with_cover  = "--with-cover" in args
 if with_cover:
     from src import cover  # import lazy: solo necesita anthropic si se piden cartas
@@ -237,7 +237,7 @@ for job in clean_jobs:
 
     # Saltar si ya se listo en una corrida de descubrimiento previa
     if job["url"] in seen_urls:
-        print("  [=] Ya listada antes — omitida (usa gen_cover.py si querés su carta)")
+        print("  [=] Ya listada antes — omitida (usa cli/gen_cover.py si querés su carta)")
         continue
 
     # Scrapear descripcion completa si la API no la trajo
@@ -294,7 +294,7 @@ for job in clean_jobs:
         job["ats_platform"] = "getonbrd"
 
     # Generar carta SOLO si se pidio (--with-cover). Por defecto solo se lista:
-    # cuesta API y el ~95% nunca se usa. Carta on-demand via gen_cover.py.
+    # cuesta API y el ~95% nunca se usa. Carta on-demand via cli/gen_cover.py.
     carta = None
     out_path = None
     if with_cover:
@@ -314,12 +314,12 @@ for job in clean_jobs:
             applied.mark_applied(job["url"])
             applied_urls.add(job["url"])
     else:
-        print("  [+] Candidata listada (sin carta — gen_cover.py para generar)")
+        print("  [+] Candidata listada (sin carta — cli/gen_cover.py para generar)")
 
     results.append({"job": job, "match": match, "carta": carta, "path": out_path})
 
 # ---------------------------------------------------------------------------
-# Volcar candidatas a JSON para la fase on-demand (gen_cover.py --from-json)
+# Volcar candidatas a JSON para la fase on-demand (cli/gen_cover.py --from-json)
 # ---------------------------------------------------------------------------
 if results:
     cand_path = os.path.join(OUT_DIR, f"candidates_{datetime.date.today()}.json")
@@ -342,7 +342,7 @@ if results:
         json.dump(new_cands, f, ensure_ascii=False, indent=2)
     api_tag = "con API (cartas generadas)" if with_cover else "0 API (solo listado)"
     print(f"\nCandidatos guardados: {cand_path}  ({len(results)} ofertas, {api_tag})")
-    print(f"  Generá carta on-demand: python gen_cover.py --from-json {cand_path} --pick <n>")
+    print(f"  Generá carta on-demand: python cli/gen_cover.py --from-json {cand_path} --pick <n>")
 
 # ---------------------------------------------------------------------------
 # Auto-apply (Workable / Greenhouse — plataformas soportadas)
@@ -365,7 +365,7 @@ if with_cover and not no_apply:
         has_gob_session = os.path.exists(gob_session)
         if not has_gob_session:
             print("[!] Sin sesión GetOnBrd guardada.")
-            print("    Corre: python setup_gob_session.py")
+            print("    Corre: python scripts/setup_gob_session.py")
             print("    Los jobs de GetOnBrd se moverán a aplicar manual.\n")
 
         cv_abs = apply_ats.cv_path_resolve("cv_path")

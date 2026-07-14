@@ -538,12 +538,16 @@ def filter_himalayas_location(jobs: list[dict]) -> list[dict]:
     return result
 
 # ---------------------------------------------------------------------------
-# Wellfound (ex AngelList) — requiere sesión guardada con setup_wellfound_session.py
+# Wellfound (ex AngelList) — requiere sesión guardada con scripts/setup_wellfound_session.py
 # ---------------------------------------------------------------------------
 
 _WELLFOUND_SESSION = os.getenv(
     "WELLFOUND_SESSION_PATH",
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), ".wellfound_session.json"),
+    # src/boards/remote_global.py → boards → src → raíz del proyecto (3 niveles).
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        ".wellfound_session.json",
+    ),
 )
 
 # Endpoint GraphQL de Wellfound (reverse-engineered)
@@ -560,7 +564,7 @@ def discover_wellfound(max_pages: int = 5) -> list[dict]:
     """Descubre ofertas en Wellfound interceptando requests GraphQL del browser.
 
     Requiere sesión guardada en .wellfound_session.json
-    (correr setup_wellfound_session.py una vez).
+    (correr scripts/setup_wellfound_session.py una vez).
 
     DataDome bloquea headless → usa browser visible (headless=False).
     Intercepta la request JobSearchResultsX que el browser hace automáticamente.
@@ -569,7 +573,7 @@ def discover_wellfound(max_pages: int = 5) -> list[dict]:
       data.talent.jobSearchResults.startups.edges[].node.highlightedJobListings[]
     """
     if not os.path.exists(_WELLFOUND_SESSION):
-        print("  [!] Sin sesión Wellfound. Corré: python setup_wellfound_session.py")
+        print("  [!] Sin sesión Wellfound. Corré: python scripts/setup_wellfound_session.py")
         return []
 
     try:

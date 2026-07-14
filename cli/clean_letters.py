@@ -4,8 +4,8 @@
 Mueve output/cartas/disc_*.txt a output/cartas/archive/YYYY-MM-DD/
 
 Uso:
-  python clean_letters.py           # archiva con fecha de hoy
-  python clean_letters.py --delete  # borra en lugar de archivar
+  python cli/clean_letters.py           # archiva con fecha de hoy
+  python cli/clean_letters.py --delete  # borra en lugar de archivar
 """
 
 import os

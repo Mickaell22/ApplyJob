@@ -136,5 +136,5 @@ with sync_playwright() as p:
 
 print()
 print("Listo. Ahora podés correr:")
-print("  .venv/bin/python3 run_discover.py wellfound --no-apply")
+print("  .venv/bin/python3 cli/run_discover.py wellfound --no-apply")
 print()

@@ -105,5 +105,5 @@ with sync_playwright() as p:
     browser.close()
 
 print("\nListo. Ahora corré:")
-print("  .venv/bin/python3 run_discover.py --dry-run")
+print("  .venv/bin/python3 cli/run_discover.py --dry-run")
 print()
