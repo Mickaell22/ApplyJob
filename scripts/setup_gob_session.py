@@ -12,13 +12,13 @@ Solo necesitas hacer esto UNA vez (o cuando la sesión expire).
 """
 
 import os, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
 SESSION_PATH = os.getenv(
     "GETONBRD_SESSION_PATH",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), ".gob_session.json"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".gob_session.json"),
 )
 
 print("=" * 60)

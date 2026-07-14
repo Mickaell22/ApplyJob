@@ -14,7 +14,7 @@ import shutil
 from datetime import date
 from pathlib import Path
 
-CARTAS_DIR = Path(__file__).parent / "output" / "cartas"
+CARTAS_DIR = Path(__file__).resolve().parent.parent / "output" / "cartas"
 DELETE = "--delete" in sys.argv
 
 letters = sorted(CARTAS_DIR.glob("disc_*.txt"))

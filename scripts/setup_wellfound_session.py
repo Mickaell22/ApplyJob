@@ -13,13 +13,13 @@ Solo necesitás hacer esto UNA vez (o cuando la sesión expire).
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 SESSION_PATH = os.getenv(
     "WELLFOUND_SESSION_PATH",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), ".wellfound_session.json"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".wellfound_session.json"),
 )
 
 EMAIL    = os.getenv("WELLFOUND_EMAIL", "")

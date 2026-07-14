@@ -43,9 +43,9 @@ import os
 import json
 import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 # OJO: cover (DeepSeek/anthropic) se importa lazy mas abajo, solo con --with-cover.
 # Asi el modo listado (default, 0 API) corre sin la dependencia anthropic.
@@ -54,7 +54,7 @@ from src import boards
 from src import applied
 from src.scraper import fetch_job
 
-OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "cartas")
+OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "cartas")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # URLs ya postuladas (carta generada / envio real) y ya listadas en corridas
@@ -67,7 +67,7 @@ args = sys.argv[1:]
 only_board  = next((a for a in args if a in (
     "getonbrd", "himalayas", "weworkremotely", "4dayweek",
     "remotefirstjobs", "workingnomads", "remotive", "glovo", "wellfound",
-    "linkedin", "hackernews", "linkedin-local", "computrabajo",
+    "linkedin", "linkedin-auth", "hackernews", "linkedin-local", "computrabajo",
     "multitrabajos", "local",
 )), None)
 remote_only = "--no-remote" not in args
@@ -144,6 +144,13 @@ if not only_board or only_board == "linkedin":
     li_global = boards.filter_global_remote(li_jobs)
     print(f"  {len(li_jobs)} ofertas → {len(li_global)} accesibles desde Ecuador")
     discovered.extend(li_global)
+
+if not only_board or only_board == "linkedin-auth":
+    print("\nLinkedIn AUTENTICADO (sesion guardada)...")
+    lia_jobs = boards.discover_linkedin_auth(remote_only=remote_only)
+    lia_global = boards.filter_global_remote(lia_jobs)
+    print(f"  {len(lia_jobs)} ofertas → {len(lia_global)} accesibles desde Ecuador")
+    discovered.extend(lia_global)
 
 if not only_board or only_board == "hackernews":
     print("\nHacker News (Who is hiring)...")
@@ -354,7 +361,7 @@ if with_cover and not no_apply:
 
         from playwright.sync_api import sync_playwright
 
-        gob_session = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".gob_session.json")
+        gob_session = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".gob_session.json")
         has_gob_session = os.path.exists(gob_session)
         if not has_gob_session:
             print("[!] Sin sesión GetOnBrd guardada.")

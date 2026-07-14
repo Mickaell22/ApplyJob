@@ -22,9 +22,9 @@ import re
 import json
 import argparse
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 # cover (DeepSeek/anthropic) se importa lazy justo antes de generar, asi listar
 # el JSON de candidatos (--from-json sin --pick) no requiere anthropic.
@@ -104,7 +104,7 @@ if not a.no_eval:
 from src import cover  # import lazy: anthropic solo al momento de generar
 carta = cover.generate(job, cv, lang=a.lang)
 slug = re.sub(r"[^a-z0-9]+", "_", (job.get("company") or job.get("title") or "carta").lower())[:50].strip("_")
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "cartas", f"manual_{slug}.txt")
+out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "cartas", f"manual_{slug}.txt")
 os.makedirs(os.path.dirname(out), exist_ok=True)
 with open(out, "w", encoding="utf-8") as f:
     f.write(carta)

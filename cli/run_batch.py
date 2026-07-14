@@ -18,15 +18,15 @@ import json
 import datetime
 import httpx
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 # cover (DeepSeek/anthropic) se importa lazy mas abajo, solo con --with-cover.
 from src import profile, matcher, boards
 from src.scraper import fetch_job
 
-OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "cartas")
+OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "cartas")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # ---------------------------------------------------------------------------

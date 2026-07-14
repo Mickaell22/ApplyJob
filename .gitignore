@@ -20,4 +20,5 @@ output/cartas/
 output/
 .gob_session.json
 .wellfound_session.json
+.linkedin_session.json
 applied_urls.txt
