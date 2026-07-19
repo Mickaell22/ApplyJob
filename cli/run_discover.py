@@ -275,8 +275,18 @@ for job in clean_jobs:
     match = matcher.score(job, cv)
     print(f"  Match: {match['score']}% ({match['fit']}) — techs: {match['matched_techs'][:6]}")
     if match["fit"] == "baja":
-        print("  [x] Compatibilidad baja — omitida")
-        continue
+        # Canal local: no descartar juniors por match bajo si hay senal dev real.
+        # El matcher subestima descripciones cortas en espanol; el objetivo del
+        # canal local es cualquier rol dev junior en el pais. Pero SI se excluyen
+        # los roles de VENTAS ("Desarrollador de Negocios/Comercial", 0 techs).
+        _sales = re.search(r"de negocios|comercial|ejecutiv|cuentas clave|"
+                           r"canal |ventas|horeca|preventa",
+                           job.get("title", "").lower())
+        if job.get("canal") == "local" and match["matched_techs"] and not _sales:
+            print("  [~] Match bajo, pero dev local con senal — se lista igual")
+        else:
+            print("  [x] Compatibilidad baja — omitida")
+            continue
 
     # Verificacion opcional de vigencia (request extra por candidata)
     # NO se marca como vista si esta muerta: un falso positivo puede reaparecer
