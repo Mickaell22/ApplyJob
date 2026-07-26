@@ -176,8 +176,8 @@ def build_es():
     add_bullet(doc, "Desarrollé sistema de gestión clínica Tia Glenda (React + MUI + Flask + PostgreSQL, ~130 componentes) en producción, con RBAC de 3 roles y 23 suites de tests.")
     add_bullet(doc, "Construí plataforma de pedidos con FastAPI + SQLAlchemy + Alembic, en producción en novamicktools.com.")
     add_bullet(doc, "Implementé la integración con el SRI de Ecuador para un e-commerce: generación del XML, clave de acceso de 49 dígitos y envío de sobres SOAP a recepción y autorización (ambiente de pruebas).")
-    add_bullet(doc, "Implementé SimuladorPreguntas universitario (React + FastAPI + PostgreSQL) con roles diferenciados y medidas anti-trampa.")
-    add_bullet(doc, "Desarrollé Taller App: sistema de gestión para taller mecánico (Node.js + React), proyecto freelance completado.")
+    add_bullet(doc, "Implementé SimuladorPreguntas universitario (React + Express 5 + PostgreSQL) con roles diferenciados, medidas anti-trampa y despliegue en Docker multi-stage con usuario no-root y nginx.")
+    add_bullet(doc, "Desarrollé Taller App: gestión para taller mecánico (Express + Sequelize + PDFKit + React), con 5 suites de tests Jest + Supertest.")
 
     add_org_line(doc, "Área de Nivelación — Universidad de Guayaquil", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Practicante de Desarrollo de Software", "Feb. 2026 – Jul. 2026")
@@ -280,8 +280,8 @@ def build_en():
     add_bullet(doc, "Built Tia Glenda clinical management system (React + MUI + Flask + PostgreSQL, ~130 components) in production, with 3-role RBAC and 23 test suites.")
     add_bullet(doc, "Built an order management platform with FastAPI + SQLAlchemy + Alembic, running in production at novamicktools.com.")
     add_bullet(doc, "Implemented the integration with Ecuador's SRI tax authority for an e-commerce: XML generation, 49-digit access key, and SOAP envelopes sent to the reception and authorization endpoints (test environment).")
-    add_bullet(doc, "Implemented university exam simulator (React + FastAPI + PostgreSQL) with role-based access and anti-cheating measures.")
-    add_bullet(doc, "Delivered Taller App: workshop management system (Node.js + React) for a freelance client.")
+    add_bullet(doc, "Implemented university exam simulator (React + Express 5 + PostgreSQL) with role-based access, anti-cheating measures, and a multi-stage Docker deployment running as a non-root user behind nginx.")
+    add_bullet(doc, "Delivered Taller App: workshop management system (Express + Sequelize + PDFKit + React) with 5 Jest + Supertest suites.")
 
     add_org_line(doc, "Leveling Area — University of Guayaquil", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Software Development Intern", "Feb 2026 – Jul 2026")
