@@ -154,8 +154,9 @@ def build_es():
     add_body(
         doc,
         "Desarrollador fullstack con sistemas en producción para clientes reales en Ecuador "
-        "(gestión clínica, facturación electrónica SRI, inventario multisucursal). "
-        "Especializado en Django/DRF y React/Next.js, con formación complementaria en ciberseguridad.",
+        "(gestión clínica, facturación, inventario multisucursal). "
+        "Especializado en Django/DRF y React/Next.js, con pruebas automatizadas y CI/CD, "
+        "y formación complementaria en ciberseguridad.",
     )
 
     # ── EXPERIENCIA ──
@@ -167,13 +168,14 @@ def build_es():
     add_role_line(doc, "Co-fundador & Desarrollador Fullstack", "Feb. 2026 – presente")
     add_bullet(doc, "Desarrollé backend con Django 5 + DRF + PostgreSQL para plataforma SaaS multitenancy del sector gastronómico.")
     add_bullet(doc, "Integré asistente IA con Claude (Anthropic) para consultas de inventario, gestión de pedidos y reportes automáticos.")
-    add_bullet(doc, "Construí app móvil con Flutter + Riverpod con sincronización en tiempo real vía Firebase.")
-    add_bullet(doc, "Diseñé arquitectura multitenancy con aislamiento de datos por tenant y sistema de suscripción mensual.")
+    add_bullet(doc, "Construí app móvil con Flutter + Riverpod que consume la API REST con dio y almacenamiento seguro de sesión.")
+    add_bullet(doc, "Diseñé multitenancy por queryset: manager for_tenant() sobre modelo base abstracto que fuerza el aislamiento de datos antes de llegar al ViewSet.")
 
     add_org_line(doc, "Freelance", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Desarrollador Fullstack", "Jul. 2025 – presente")
-    add_bullet(doc, "Desarrollé sistema de gestión clínica Tia Glenda (React + MUI + Python + PostgreSQL, 190+ componentes) en producción.")
-    add_bullet(doc, "Construí sistema de facturación electrónica integrado con el SRI de Ecuador, en producción en novamicktools.com.")
+    add_bullet(doc, "Desarrollé sistema de gestión clínica Tia Glenda (React + MUI + Flask + PostgreSQL, ~130 componentes) en producción, con RBAC de 3 roles y 23 suites de tests.")
+    add_bullet(doc, "Construí plataforma de pedidos con FastAPI + SQLAlchemy + Alembic, en producción en novamicktools.com.")
+    add_bullet(doc, "Implementé la integración con el SRI de Ecuador para un e-commerce: generación del XML, clave de acceso de 49 dígitos y envío de sobres SOAP a recepción y autorización (ambiente de pruebas).")
     add_bullet(doc, "Implementé SimuladorPreguntas universitario (React + FastAPI + PostgreSQL) con roles diferenciados y medidas anti-trampa.")
     add_bullet(doc, "Desarrollé Taller App: sistema de gestión para taller mecánico (Node.js + React), proyecto freelance completado.")
 
@@ -201,15 +203,21 @@ def build_es():
     # ── PROYECTOS ──
     add_section(doc, "Proyectos")
 
-    add_org_line(doc, "MotoVox", "github.com/Mickaell22/MotoVox")
-    add_role_line(doc, "App de comunicación por voz para motociclistas", "Flutter · C · WebRTC · FFI")
-    add_bullet(doc, "Integré código C nativo con Flutter vía FFI para procesamiento de audio en tiempo real sin JVM overhead.")
-    add_bullet(doc, "Implementé streaming de audio peer-to-peer vía WebRTC sin servidor intermediario.")
+    add_org_line(doc, "RestoVentas", "github.com/Mickaell22/restoventas-backend")
+    add_role_line(doc, "App de ventas para restaurante con pedidos por voz", "NestJS · TypeORM · React Native · IA")
+    add_bullet(doc, "Construí backend NestJS 11 con TypeORM y migraciones, autenticación Passport-JWT con guards y DTOs validados con class-validator.")
+    add_bullet(doc, "Desarrollé app React Native + Expo con Zustand para el estado global y captura de audio para tomar pedidos hablados.")
+    add_bullet(doc, "Implementé parseo de pedidos en lenguaje natural con LLM + STT, saneando la salida del modelo contra el catálogo real de productos para no confiar en ella a ciegas.")
+
+    add_org_line(doc, "MotoVox", "github.com/Mickaell22/MotoVox", space_before=6)
+    add_role_line(doc, "App de comunicación por voz para motociclistas", "Flutter · C nativo · FFI · Sockets")
+    add_bullet(doc, "Integré código C nativo con Flutter vía FFI (compilado con NDK para ARM64) para filtrado de ruido en tiempo real sin overhead de JVM.")
+    add_bullet(doc, "Implementé audio peer-to-peer sobre WiFi local con sockets TCP crudos (tcpNoDelay para minimizar latencia) y descubrimiento de salas por broadcast UDP, sin servidor intermediario.")
 
     add_org_line(doc, "QR Shield", "github.com/Mickaell22/qr-shield", space_before=6)
-    add_role_line(doc, "Herramienta de seguridad para análisis de QR", "Python · Chrome Extension")
-    add_bullet(doc, "Desarrollé extensión Chrome que intercepta escaneos de QR y consulta API Python para validar URLs maliciosas.")
-    add_bullet(doc, "Construí API REST en Python con análisis de reputación de dominios y detección de phishing.")
+    add_role_line(doc, "Motor de detección de QR maliciosos (tesis)", "Python · FastAPI · Tests")
+    add_bullet(doc, "Construí API REST en FastAPI con una capa de heurísticas de URL para detectar quishing, cubierta con tests automatizados.")
+    add_bullet(doc, "Diseñé la arquitectura por capas de análisis L1–L5, con las integraciones de reputación de dominios planificadas como siguiente etapa.")
 
     add_org_line(doc, "ApplyJob", "github.com/Mickaell22/ApplyJob", space_before=6)
     add_role_line(doc, "Pipeline de agregación y matching de ofertas con LLMs", "Python · Playwright · LLMs")
@@ -219,11 +227,12 @@ def build_es():
     # ── HABILIDADES ──
     add_section(doc, "Habilidades")
 
-    add_skills_line(doc, "Backend", "Python, Django, FastAPI, Node.js, Express, C#, Java")
-    add_skills_line(doc, "Frontend", "React, Next.js, TypeScript, Tailwind CSS, Vite")
-    add_skills_line(doc, "Móvil", "Flutter, Dart, Riverpod, Firebase")
-    add_skills_line(doc, "Bases de datos", "PostgreSQL, SQLAlchemy, Alembic, Firebase Firestore, SQLite")
-    add_skills_line(doc, "Herramientas", "Git, Docker, Linux, VPS (Railway), Cloudinary, Postman")
+    add_skills_line(doc, "Backend", "Python, Django/DRF, FastAPI, Flask, Node.js, Express, NestJS, C#, Java, PHP")
+    add_skills_line(doc, "Frontend", "React, Next.js, TypeScript, Tailwind CSS, Vite, Material UI, Zustand, Redux Toolkit")
+    add_skills_line(doc, "Móvil", "Flutter, Dart, Riverpod, React Native, Expo, Kotlin")
+    add_skills_line(doc, "Bases de datos", "PostgreSQL, SQLAlchemy/Alembic, TypeORM, Prisma, Sequelize, Firebase, SQLite")
+    add_skills_line(doc, "Testing", "pytest, Jest, Vitest, Testing Library, Supertest, JUnit + Mockito")
+    add_skills_line(doc, "DevOps", "Git, Docker (multi-stage), CI/CD con GitHub Actions, Linux, VPS (Railway), nginx")
     add_skills_line(doc, "Ciberseguridad", "Kali Linux, Nmap, Wireshark, fundamentos de ethical hacking")
     add_skills_line(doc, "Idiomas", "Español (nativo), Inglés (B2 — lectura, escritura técnica y conversacional)")
 
@@ -251,8 +260,9 @@ def build_en():
     add_body(
         doc,
         "Fullstack developer with systems running in production for real clients in Ecuador "
-        "(clinical management, SRI e-invoicing, multi-branch inventory). "
-        "Focused on Django/DRF and React/Next.js, with complementary training in cybersecurity.",
+        "(clinical management, order platform, multi-branch inventory). "
+        "Focused on Django/DRF and React/Next.js, with automated testing and CI/CD, "
+        "and complementary training in cybersecurity.",
     )
 
     # ── EXPERIENCE ──
@@ -262,13 +272,14 @@ def build_en():
     add_role_line(doc, "Co-founder & Fullstack Developer", "Feb 2026 – present")
     add_bullet(doc, "Built backend with Django 5 + Django REST Framework + PostgreSQL for a multitenancy SaaS targeting the restaurant industry.")
     add_bullet(doc, "Integrated an AI assistant powered by Claude (Anthropic) for inventory queries, order management, and automated reports.")
-    add_bullet(doc, "Developed mobile app with Flutter + Riverpod with real-time sync via Firebase.")
-    add_bullet(doc, "Designed multitenancy architecture with per-tenant data isolation and monthly subscription billing.")
+    add_bullet(doc, "Developed mobile app with Flutter + Riverpod consuming the REST API with dio, with secure session storage.")
+    add_bullet(doc, "Designed queryset-level multitenancy: a for_tenant() manager on an abstract base model that enforces data isolation before the ViewSet is reached.")
 
     add_org_line(doc, "Freelance", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Fullstack Developer", "Jul 2025 – present")
-    add_bullet(doc, "Built Tia Glenda clinical management system (React + MUI + Python + PostgreSQL, 190+ components) — in production.")
-    add_bullet(doc, "Developed an e-invoicing system integrated with Ecuador's SRI tax authority, running in production at novamicktools.com.")
+    add_bullet(doc, "Built Tia Glenda clinical management system (React + MUI + Flask + PostgreSQL, ~130 components) in production, with 3-role RBAC and 23 test suites.")
+    add_bullet(doc, "Built an order management platform with FastAPI + SQLAlchemy + Alembic, running in production at novamicktools.com.")
+    add_bullet(doc, "Implemented the integration with Ecuador's SRI tax authority for an e-commerce: XML generation, 49-digit access key, and SOAP envelopes sent to the reception and authorization endpoints (test environment).")
     add_bullet(doc, "Implemented university exam simulator (React + FastAPI + PostgreSQL) with role-based access and anti-cheating measures.")
     add_bullet(doc, "Delivered Taller App: workshop management system (Node.js + React) for a freelance client.")
 
@@ -296,15 +307,21 @@ def build_en():
     # ── PROJECTS ──
     add_section(doc, "Projects")
 
-    add_org_line(doc, "MotoVox", "github.com/Mickaell22/MotoVox")
-    add_role_line(doc, "Voice communication app for motorcycle riders", "Flutter · C · WebRTC · FFI")
-    add_bullet(doc, "Integrated native C code with Flutter via FFI for real-time audio processing with no JVM overhead.")
-    add_bullet(doc, "Implemented peer-to-peer audio streaming via WebRTC without an intermediary server.")
+    add_org_line(doc, "RestoVentas", "github.com/Mickaell22/restoventas-backend")
+    add_role_line(doc, "Restaurant sales app with voice-driven ordering", "NestJS · TypeORM · React Native · AI")
+    add_bullet(doc, "Built a NestJS 11 backend with TypeORM and migrations, Passport-JWT authentication with guards, and DTOs validated with class-validator.")
+    add_bullet(doc, "Developed a React Native + Expo app using Zustand for global state, with audio capture for spoken orders.")
+    add_bullet(doc, "Implemented natural-language order parsing with an LLM plus speech-to-text, sanitizing the model output against the real product catalog rather than trusting it blindly.")
+
+    add_org_line(doc, "MotoVox", "github.com/Mickaell22/MotoVox", space_before=6)
+    add_role_line(doc, "Voice communication app for motorcycle riders", "Flutter · Native C · FFI · Sockets")
+    add_bullet(doc, "Integrated native C code with Flutter via FFI (compiled with the NDK for ARM64) for real-time noise filtering with no JVM overhead.")
+    add_bullet(doc, "Implemented peer-to-peer audio over local WiFi using raw TCP sockets (tcpNoDelay to minimize latency) and UDP broadcast for room discovery, with no intermediary server.")
 
     add_org_line(doc, "QR Shield", "github.com/Mickaell22/qr-shield", space_before=6)
-    add_role_line(doc, "Security tool for QR code analysis", "Python · Chrome Extension")
-    add_bullet(doc, "Built a Chrome extension that intercepts QR scans and queries a Python API to validate URLs for malicious content.")
-    add_bullet(doc, "Developed REST API in Python with domain reputation analysis and phishing detection.")
+    add_role_line(doc, "Malicious QR code detection engine (thesis)", "Python · FastAPI · Tests")
+    add_bullet(doc, "Built a REST API in FastAPI with a URL heuristics layer to detect quishing, covered by automated tests.")
+    add_bullet(doc, "Designed the L1-L5 layered analysis architecture, with domain reputation integrations planned as the next stage.")
 
     add_org_line(doc, "ApplyJob", "github.com/Mickaell22/ApplyJob", space_before=6)
     add_role_line(doc, "Job posting aggregation and matching pipeline with LLMs", "Python · Playwright · LLMs")
@@ -314,11 +331,12 @@ def build_en():
     # ── SKILLS ──
     add_section(doc, "Skills")
 
-    add_skills_line(doc, "Backend", "Python, Django, FastAPI, Node.js, Express, C#, Java")
-    add_skills_line(doc, "Frontend", "React, Next.js, TypeScript, Tailwind CSS, Vite")
-    add_skills_line(doc, "Mobile", "Flutter, Dart, Riverpod, Firebase")
-    add_skills_line(doc, "Databases", "PostgreSQL, SQLAlchemy, Alembic, Firebase Firestore, SQLite")
-    add_skills_line(doc, "Tools", "Git, Docker, Linux, VPS (Railway), Cloudinary, Postman")
+    add_skills_line(doc, "Backend", "Python, Django/DRF, FastAPI, Flask, Node.js, Express, NestJS, C#, Java, PHP")
+    add_skills_line(doc, "Frontend", "React, Next.js, TypeScript, Tailwind CSS, Vite, Material UI, Zustand, Redux Toolkit")
+    add_skills_line(doc, "Mobile", "Flutter, Dart, Riverpod, React Native, Expo, Kotlin")
+    add_skills_line(doc, "Databases", "PostgreSQL, SQLAlchemy/Alembic, TypeORM, Prisma, Sequelize, Firebase, SQLite")
+    add_skills_line(doc, "Testing", "pytest, Jest, Vitest, Testing Library, Supertest, JUnit + Mockito")
+    add_skills_line(doc, "DevOps", "Git, Docker (multi-stage), CI/CD with GitHub Actions, Linux, VPS (Railway), nginx")
     add_skills_line(doc, "Cybersecurity", "Kali Linux, Nmap, Wireshark, ethical hacking fundamentals")
     add_skills_line(doc, "Languages", "Spanish (native), English (B2 — reading, technical writing, conversational)")
 
