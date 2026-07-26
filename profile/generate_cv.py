@@ -164,7 +164,7 @@ def build_es():
     # producción pesan más que la etiqueta de "9no semestre".
     add_section(doc, "Experiencia")
 
-    add_org_line(doc, "EcuaInventario", "Guayaquil, Ecuador")
+    add_org_line(doc, "Facilito", "Guayaquil, Ecuador")
     add_role_line(doc, "Co-fundador & Desarrollador Fullstack", "Feb. 2026 – presente")
     add_bullet(doc, "Desarrollé backend con Django 5 + DRF + PostgreSQL para plataforma SaaS multitenancy del sector gastronómico.")
     add_bullet(doc, "Integré asistente IA con Claude (Anthropic) para consultas de inventario, gestión de pedidos y reportes automáticos.")
@@ -268,7 +268,7 @@ def build_en():
     # ── EXPERIENCE ──
     add_section(doc, "Experience")
 
-    add_org_line(doc, "EcuaInventario", "Guayaquil, Ecuador")
+    add_org_line(doc, "Facilito", "Guayaquil, Ecuador")
     add_role_line(doc, "Co-founder & Fullstack Developer", "Feb 2026 – present")
     add_bullet(doc, "Built backend with Django 5 + Django REST Framework + PostgreSQL for a multitenancy SaaS targeting the restaurant industry.")
     add_bullet(doc, "Integrated an AI assistant powered by Claude (Anthropic) for inventory queries, order management, and automated reports.")
