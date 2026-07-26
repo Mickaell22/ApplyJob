@@ -17,10 +17,7 @@ def load_profile(path: str = "profile/cv.md") -> dict:
         return {"error": f"No se encontro {path}"}
 
     text = p.read_text()
-    return {
-        "full_text": text,
-        "techs": _extract_list(text, r"(?:stack|skills|tecnologias)[:\s]*([\s\S]*?)(?:\n#|\n##|\Z)"),
-    }
+    return {"full_text": text, "techs": _extract_techs(text)}
 
 
 def score(job: dict, profile: dict) -> dict:
@@ -28,7 +25,9 @@ def score(job: dict, profile: dict) -> dict:
     text = (job.get("title", "") + " " + job.get("description", "")).lower()
     keywords = [k.lower() for k in profile.get("techs", [])]
 
-    matched = [k for k in keywords if k in text]
+    # Limite de palabra: con substring puro "ci" matchea "efficient" y "java"
+    # matchea "javascript", inflando el score con ofertas que no son del stack.
+    matched = [k for k in keywords if re.search(rf"(?<!\w){re.escape(k)}(?!\w)", text)]
     # Frameworks adyacentes (Vue/Angular/etc.): suman como senal para un dev React,
     # pero NO al denominador, para no descartar juniors front-end de otro framework.
     adjacent = [k for k in ADJACENT_TECHS if k in text and k not in matched]
@@ -38,13 +37,34 @@ def score(job: dict, profile: dict) -> dict:
     return {
         "score": score,
         "matched_techs": matched + adjacent,
-        "fit": "alta" if score >= 40 else "media" if score >= 8 else "baja",
+        # El fit va por CANTIDAD de coincidencias, no por %: el denominador es el
+        # CV entero, asi que ampliar el stack bajaba el % de la misma oferta y
+        # descalibraba los umbrales. 6 techs = claramente del stack; 2 = senal.
+        "fit": "alta" if hits >= 6 else "media" if hits >= 2 else "baja",
     }
 
 
-def _extract_list(text: str, pattern: str) -> list[str]:
-    match = re.search(pattern, text, re.I)
-    if not match:
-        return []
-    raw = match.group(1)
-    return re.findall(r"[A-Za-z#+]+(?:\.?\w+)*", raw)
+def _extract_techs(text: str) -> list[str]:
+    """Tecnologias listadas en las secciones Stack/Skills del CV.
+
+    El encabezado va anclado a inicio de linea a proposito: sin el ancla, el
+    "Desarrollador fullstack" del Perfil matchea primero y se extraen las
+    palabras de esa frase ("en", "y", "de") como si fueran tecnologias.
+    """
+    blocks = re.findall(
+        r"^#{1,4}[ \t]*(?:stack|skills|tecnolog\w+)[ \t]*$\n([\s\S]*?)(?=^#|\Z)",
+        text,
+        re.I | re.M,
+    )
+    techs = []
+    for line in "\n".join(blocks).splitlines():
+        label, sep, rest = line.partition(":")
+        if sep and label.strip("* ").lower() in ("idiomas", "languages"):
+            continue
+        # ponytail: el CV lista el stack separado por comas y las barras son
+        # pares ("Django/DRF"); los parentesis son aclaraciones, no techs.
+        for tok in re.split(r"[,/]", re.sub(r"\(.*?\)|\*+", "", rest if sep else line)):
+            tok = tok.strip(" .")
+            if 2 <= len(tok) <= 30 and re.match(r"[A-Za-z]", tok):
+                techs.append(tok)
+    return list(dict.fromkeys(techs))

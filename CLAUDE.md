@@ -23,8 +23,7 @@ ApplyJob automatiza postulaciones laborales. Pipeline: extraer ofertas → match
 - `profile/story_bank.md` — banco de historias STAR+Reflexión para entrevistas conductuales (AI interview Wellfound, HireVue/Paradox). GITIGNORED; tiene huecos `<completar: ...>` que llena el candidato
 - `src/applied.py` — tracking compartido de URLs: `applied_urls.txt` (con carta/postuladas) + `output/seen_discovered.txt` (ya listadas, evita re-listar). Usado por `cli/run_discover.py` y `cli/gen_cover.py`
 - `scripts/setup_gob_session.py` — guarda sesion GetOnBrd una vez (magic link); requerido para auto-apply en GetOnBrd
-- `profile/cv.md` — perfil del candidato en español (stack, experiencia, skills)
-- `profile/cv_en.md` — perfil del candidato en INGLES (para ofertas en ingles, ej. Canonical)
+- `profile/cv.md` — perfil del candidato en español (stack, experiencia, skills). Lo consumen `matcher.load_profile()`, `cover.py` y `evaluator.py`. NO se genera desde `generate_cv.py`: se mantiene a mano, así que al tocar el CV hay que actualizar LOS DOS o el pipeline sigue vendiendo claims viejos (pasó el 2026-07-26 con WebRTC/Firebase). No existe un `cv_en.md`: las cartas en inglés salen de este mismo perfil
 - `profile/cv_es.pdf` — CV en PDF formato Harvard (español); ruta en `CV_PATH` del .env
 - `profile/cv_en.pdf` — CV en PDF formato Harvard (ingles); ruta en `CV_PATH_EN` del .env
 - `profile/cv_es.docx` — fuente editable del CV ES (formato Harvard)
@@ -67,15 +66,20 @@ Usa Playwright headless Chromium para llenar formularios de postulacion.
 
 ## CV / Profile
 
-El perfil esta en `profile/cv.md`. Se extraen tecnologias via regex de las secciones "Stack" y "Skills".
-
-**Techs extraidos:** python, django, fastapi, react, typescript, node.js, flutter, dart, postgresql, docker, linux, git, firebase, rest, api, y mas (25 total).
+El perfil esta en `profile/cv.md`. `_extract_techs()` toma las secciones "Stack" y "Skills"
+(encabezado anclado a inicio de linea), separa por comas y por `/` ("Django/DRF" → dos techs),
+descarta parentesis y la linea de Idiomas. **53 techs** al 2026-07-26.
 
 ## Matcher
 
 `matcher.score(job, cv)` → compara tech keywords contra titulo+descripcion de la oferta.
-- Score = (keywords matcheados / total keywords) * 100
-- >40% = alta, 20-40% = media, <20% = baja (descartada)
+- `score` = (keywords matcheados / total keywords del CV) * 100 — solo informativo
+- `fit` va por CANTIDAD de coincidencias, NO por %: >=6 alta, >=2 media, <2 baja (descartada).
+  El % depende del tamaño del CV (ampliar el stack baja el % de la misma oferta), asi que
+  usarlo de umbral se descalibra solo. Todos los `cli/*` descartan con `fit == "baja"`.
+- El match es por limite de palabra: con substring puro "ci" matchea "efficient" y "java"
+  matchea "javascript".
+- Check: `.venv/bin/python3 tests/test_matcher.py`
 
 ## Cover Letter Generation
 
@@ -261,6 +265,37 @@ IMPORTANTE: el magic link debe abrirse dentro de Playwright (pegado en terminal)
 - Correcciones de CV (2026-07-25, tras `correcciones_cv.md`): promedio real **9.01/10** (44 materias, sem. 1–9); practicantado **Feb. 2026 – Jul. 2026**; se quitó el detalle de avance de los certificados Google ("1 de 4 cursos" restaba más de lo que sumaba); **Experiencia va ANTES de Educación** y se agregó un bloque **PERFIL** de 2 líneas al inicio; ApplyJob reencuadrado a lo técnico (agregación de 7 fuentes + matching semántico + caché de prefijo) porque nombrar "auto-postulación en Workable/Greenhouse" en un CV que se envía POR Workable/Greenhouse se lee como spam de aplicaciones.
 - OJO — el candidato NO tiene CEH (2026-07-25): `correcciones_cv.md` daba por hecho una "certificación CEH reconocida por la industria". El documento real (`~/Desktop/Certificado Academia de Seguridad.pdf`) es un **curso gratuito de Ethical Hacking Red Team de 8 horas, Academia Hacker Mentor, marzo 2023**. El CEH de EC-Council es examen pagado con número verificable en su registro público. NUNCA escribir "CEH" en CV, cartas ni respuestas de formularios: es verificable y hunde el proceso. En el CV va con su nombre y duración reales, al final de Educación. Por lo mismo el bloque PERFIL dice "formación complementaria en ciberseguridad", no "(CEH)".
 - Refactor de estructura (2026-07-13): (A) `boards.py` (monolito ~1600 líneas) → paquete `src/boards/` (`_common`, `remote_global`, `linkedin`, `local`, `apply_urls` + `__init__` que re-exporta). API pública IDÉNTICA (`boards.discover_x`, incl. privados `_LOCATION_OK`/`_EXP_EXCLUDE`/etc. usados por otros módulos) → run_discover y consumidores NO se tocaron. Split hecho troceando por rangos de línea (código verbatim), verificado con import + filtros dummy + corrida real de HN. (B) Scripts de la raíz movidos: `run_*`/`gen_cover`/`main`/`clean_letters` → `cli/`; `setup_*` → `scripts/`. En cada script el "ROOT" subió un nivel (`dirname(dirname(abspath(__file__)))`) para que `.env`, `output/`, `src/` y las sesiones sigan resolviendo a la raíz. Se corren desde la raíz: `.venv/bin/python3 cli/run_discover.py ...`. `main.py` ganó `sys.path.insert` de ROOT (antes dependía del cwd).
+- Sesión 2026-07-26 (`git pull` de 2 commits hechos en la otra PC + 2 fixes): (A) los commits `9d862ad`/`1438588` corrigieron el CV tras inventariar 69 repos en código — MotoVox sin WebRTC (son sockets TCP crudos + broadcast UDP), QR Shield sin extensión Chrome (solo el motor FastAPI), EcuaInventario sin Firebase (dio contra la API REST), Tia Glenda ~130 componentes y en Flask (no "Python"), SimuladorPreguntas en Express 5 (no FastAPI), Taller App con Sequelize/PDFKit, + RestoVentas como proyecto y líneas de Testing y DevOps. (B) **Esas correcciones solo entraron en `generate_cv.py`; el `profile/cv.md` de la laptop quedó con los claims viejos** — y cv.md es lo que leen matcher/cover/evaluator, así que las cartas seguían prometiendo WebRTC y Firebase. En ksa SÍ estaba actualizado (y mejor: con inventario, gaps reales y proyectos extra), pero `profile/*.md` está gitignored y no viaja. Se copió el de ksa a la laptop. Lección: `cv.md` NO se genera desde `generate_cv.py` y NO viaja por git. (C) **Bug del matcher (preexistente, corregido)**: el regex de `_extract_list` buscaba `stack` sin anclar y matcheaba el "Desarrollador full**stack**" del bloque PERFIL, así que los "techs" del candidato eran las palabras de esa frase (`en`, `y`, `de`, `sistemas`) — todo el scoring del pipeline estaba corriendo sobre basura. Ahora el encabezado va anclado a inicio de línea (`^#{1,4}...$`), se separa por comas y `/`, y el match exige límite de palabra. De 34 tokens basura a 53 techs reales. Como el denominador creció, el `fit` pasó de umbrales en % a umbrales en cantidad de coincidencias. Verificado sobre `candidates_2026-07-13.json`: 1 alta / 14 media / 5 baja (las bajas son Rust/MySQL y títulos sin descripción). Check nuevo: `tests/test_matcher.py`.
+
+## Dos máquinas: ksa = producción, laptop Kali = desarrollo
+
+El mismo repo vive en dos PCs con roles distintos, y confundirlos es la fuente de bugs
+silenciosos (2026-07-26):
+
+- **ksa** (`~/Escritorio/Proyectos MICKAELL/ApplyJob`, host `openclaw`) — es donde el
+  candidato POSTULA. Ahí están los datos reales y es la fuente de verdad de todo lo
+  personal: `profile/cv.md`, `postulaciones.md`, `inventario_tecnico.md`,
+  `discrepancias_cv.md`, `applied_urls.txt` (77 líneas), `output/seen_discovered.txt`
+  (1270 líneas), digests. Acceso: `sudo -u mickaell ssh ksa`.
+- **laptop Kali** (`~/Desktop/Proyectos de MICKAELL/ApplyJob`) — solo DESARROLLO: se
+  corrige código y funcionalidad. Su `seen_discovered.txt` (45 líneas) y su `cv.md` son
+  copias de trabajo, NO el estado real. Nunca sincronizar en dirección laptop → ksa
+  archivos de estado: pisaría el historial real de postulaciones.
+
+**Código va laptop → GitHub → ksa** (`git pull` en ksa). **Datos personales NO viajan**:
+todo `profile/*.md`, `applied_urls.txt` y `output/` está gitignored a propósito (PII).
+Para probar el matcher contra el CV real hay que copiarlo a mano:
+
+    sudo -u mickaell ssh ksa 'cat "$HOME/Escritorio/Proyectos MICKAELL/ApplyJob/profile/cv.md"' > profile/cv.md
+
+Ojo: el `cv.md` de ksa tiene una sección `## Gaps reales` con lo que el candidato NO sabe
+(AWS, Kafka, GraphQL...). `_extract_techs` solo lee `Stack`/`Skills`, así que no se cuela
+al matcher — pero `cover.py`/`evaluator.py` reciben `full_text` completo, gaps incluidos.
+Si algún día se renombra esa sección a algo con "skills" o "stack", el matcher creería que
+domina justo lo que no sabe.
+
+Había un cron diario en ksa (`0 7 * * *` → `check_inbox.sh`, lector IMAP): ELIMINADO el
+2026-07-26 a pedido del candidato. Respaldo del crontab en `~/crontab.backup-2026-07-26`.
 
 ## Common Issues
 
