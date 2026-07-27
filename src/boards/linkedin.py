@@ -33,6 +33,14 @@ _LINKEDIN_KEYWORDS = [
     "react developer", "node.js developer", "django",
 ]
 
+# Canal local: las vacantes del pais se publican en espanol, asi que buscarlas
+# con las keywords de arriba no las encuentra. Incluye las de pasantia, que es
+# donde esta la barrera de entrada mas baja para un primer empleo.
+_LINKEDIN_KEYWORDS_LOCAL = [
+    "desarrollador", "programador", "pasante desarrollo de software",
+    "practicante desarrollo", "desarrollador junior", "pasantia sistemas",
+]
+
 
 def discover_linkedin(
     keywords: list[str] | None = None,
@@ -117,9 +125,10 @@ def discover_linkedin_local(max_pages: int = 2) -> list[dict]:
     """Canal LOCAL: ofertas en el pais del candidato (presencial/hibrido/remoto-pais).
 
     Reusa discover_linkedin() cambiando location al pais del candidato
-    (CANDIDATE_COUNTRY del .env) y quitando el filtro remoto f_WT=2. Mantiene
-    f_E=1,2 (Internship+Entry). Los jobs salen con canal="local" para que el
-    pipeline NO les aplique el geo-filtro remoto-global.
+    (CANDIDATE_COUNTRY del .env), buscando con keywords en espanol
+    (_LINKEDIN_KEYWORDS_LOCAL, incluyen pasantias) y quitando el filtro remoto
+    f_WT=2. Mantiene f_E=1,2 (Internship+Entry). Los jobs salen con
+    canal="local" para que el pipeline NO les aplique el geo-filtro remoto-global.
 
     ponytail: se busca por pais entero, no por ciudad — capta remoto-dentro-del-
     pais (valioso) a costa de ruido presencial de otras ciudades; el campo
@@ -131,7 +140,12 @@ def discover_linkedin_local(max_pages: int = 2) -> list[dict]:
         print("  [!] Sin CANDIDATE_COUNTRY/CANDIDATE_LOCATION en .env — canal local omitido")
         return []
 
-    jobs = discover_linkedin(remote_only=False, max_pages=max_pages, location=location)
+    jobs = discover_linkedin(
+        keywords=_LINKEDIN_KEYWORDS_LOCAL,
+        remote_only=False,
+        max_pages=max_pages,
+        location=location,
+    )
     for j in jobs:
         j["source"] = "linkedin-local"
         j["canal"] = "local"

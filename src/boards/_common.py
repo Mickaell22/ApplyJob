@@ -21,7 +21,12 @@ TECH_FILTER = re.compile(
     r"\b(python|django|fastapi|flask|backend|back.?end|fullstack|full.?stack|"
     r"react|typescript|node\.?js|javascript|developer|engineer|software|"
     r"devops|cloud|linux|api|junior|graduate|trainee|data|qa|mobile|flutter|"
-    r"desarrollador|programador)\b",
+    # Terminos tecnicos en espanol — sin estos se pierden las PASANTIAS locales,
+    # que casi nunca dicen "developer" en el titulo ("Pasante de Desarrollo").
+    # ponytail: no se filtra por la palabra "pasante" sino por el area tecnica,
+    # asi "Pasante de Marketing" sigue fuera sin necesidad de una lista negra.
+    r"desarrollador|programador|desarrollo|programaci[oó]n|inform[aá]tica|"
+    r"sistemas|web|m[oó]vil)\b",
     re.I,
 )
 
@@ -29,6 +34,9 @@ TECH_FILTER = re.compile(
 _SENIOR_EXCLUDE = re.compile(
     r"\b(senior|s[êe]nior|sr\.?|ssr|semi.?senior|intermedio|mid.?level|lead|architect|"
     r"principal|staff|manager|head\s+of|director|expert|experto|l[íi]der|"
+    # Equivalentes en espanol: TECH_FILTER ahora deja entrar titulos en espanol,
+    # asi que el descarte de seniority tambien tiene que hablarlo.
+    r"arquitecto|gerente|"
     r"jefe|c\.?t\.?o|v\.?p\.?|founding)\b",
     re.I,
 )
