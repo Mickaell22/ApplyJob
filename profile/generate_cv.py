@@ -1,18 +1,50 @@
 """
-Genera CV en formato Harvard para Mickaell Moran.
+Genera el CV en formato Harvard (ES + EN) del candidato configurado en .env.
 Uso: .venv/bin/python3 profile/generate_cv.py
 Produce: profile/cv_es.docx  y  profile/cv_en.docx
 PDF: libreoffice --headless --convert-to pdf --outdir profile profile/cv_es.docx profile/cv_en.docx
 """
+
+import os
+from pathlib import Path
 
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from dotenv import load_dotenv
 import copy
 
 TEXT_WIDTH_INCHES = 7.66  # 8.5" page - 0.42" * 2 margins
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+
+def _env_join(*keys: str) -> str:
+    """Une los valores presentes de esas vars con el separador del encabezado.
+
+    Los enlaces van sin esquema en el CV impreso ("github.com/x", no
+    "https://github.com/x"), asi que se recorta al vuelo.
+    """
+    vals = (
+        os.getenv(k, "").strip().removeprefix("https://").removeprefix("http://").removeprefix("www.").rstrip("/")
+        for k in keys
+    )
+    return "  •  ".join(v for v in vals if v)
+
+
+# El encabezado del CV lleva el nombre legal completo; CANDIDATE_NAME es el que
+# se usa en formularios y cartas, y puede ser la version corta.
+NAME = (os.getenv("CV_FULL_NAME") or os.getenv("CANDIDATE_NAME", "")).strip()
+LOCATION = os.getenv("CANDIDATE_LOCATION", "").strip() or ", ".join(
+    v for v in (os.getenv("CANDIDATE_CITY", "").strip(), os.getenv("CANDIDATE_COUNTRY", "").strip()) if v
+)
+# El CV sale a empresas reales: mejor reventar aca que emitir un PDF sin nombre.
+assert NAME, "Falta CANDIDATE_NAME en el .env"
+
+CONTACT_LINE_1 = "  •  ".join(v for v in (LOCATION, os.getenv("GMAIL_USER", "").strip(), os.getenv("CANDIDATE_PHONE", "").strip()) if v)
+CONTACT_LINE_2 = _env_join("CANDIDATE_LINKEDIN", "CANDIDATE_GITHUB", "CANDIDATE_WEBSITE")
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -142,12 +174,8 @@ def build_es():
     for p in doc.paragraphs:
         p._element.getparent().remove(p._element)
 
-    add_name(doc, "Mickael Adrian Moran Vera")
-    add_contact(
-        doc,
-        "Guayaquil, Ecuador  •  mickaelmoranvera03@gmail.com  •  +593 98 377 7036",
-        "linkedin.com/in/mickaell-moran-vera-ba421a2a3  •  github.com/Mickaell22  •  mickaell.novamicktools.com",
-    )
+    add_name(doc, NAME)
+    add_contact(doc, CONTACT_LINE_1, CONTACT_LINE_2)
 
     # ── PERFIL ──
     add_section(doc, "Perfil")
@@ -221,8 +249,8 @@ def build_es():
 
     add_org_line(doc, "ApplyJob", "github.com/Mickaell22/ApplyJob", space_before=6)
     add_role_line(doc, "Pipeline de agregación y matching de ofertas con LLMs", "Python · Playwright · LLMs")
-    add_bullet(doc, "Construí agregación de 7 fuentes heterogéneas (APIs JSON, RSS y HTML) normalizadas a un esquema común, con Playwright headless para las que requieren render JS.")
-    add_bullet(doc, "Implementé matching semántico contra perfil y generación de texto con LLMs; reordenar el prompt para caché de prefijo redujo ~80% los tokens de entrada.")
+    add_bullet(doc, "Construí agregación de 13 fuentes heterogéneas (APIs JSON, RSS y HTML) normalizadas a un esquema común, con Playwright headless para las que requieren render JS.")
+    add_bullet(doc, "Implementé el matching contra el perfil y la generación de texto con LLMs; reordenar el prompt dejó el 75% constante y cacheable como prefijo, y un test de regresión cubre la extracción del stack.")
 
     # ── HABILIDADES ──
     add_section(doc, "Habilidades")
@@ -248,12 +276,8 @@ def build_en():
     for p in doc.paragraphs:
         p._element.getparent().remove(p._element)
 
-    add_name(doc, "Mickael Adrian Moran Vera")
-    add_contact(
-        doc,
-        "Guayaquil, Ecuador  •  mickaelmoranvera03@gmail.com  •  +593 98 377 7036",
-        "linkedin.com/in/mickaell-moran-vera-ba421a2a3  •  github.com/Mickaell22  •  mickaell.novamicktools.com",
-    )
+    add_name(doc, NAME)
+    add_contact(doc, CONTACT_LINE_1, CONTACT_LINE_2)
 
     # ── PROFILE ──
     add_section(doc, "Profile")
@@ -325,8 +349,8 @@ def build_en():
 
     add_org_line(doc, "ApplyJob", "github.com/Mickaell22/ApplyJob", space_before=6)
     add_role_line(doc, "Job posting aggregation and matching pipeline with LLMs", "Python · Playwright · LLMs")
-    add_bullet(doc, "Built aggregation of 7 heterogeneous sources (JSON APIs, RSS, and HTML) normalized into a common schema, with headless Playwright for JS-rendered ones.")
-    add_bullet(doc, "Implemented semantic matching against the candidate profile and LLM text generation; reordering the prompt for prefix caching cut input tokens by ~80%.")
+    add_bullet(doc, "Built aggregation of 13 heterogeneous sources (JSON APIs, RSS, and HTML) normalized into a common schema, with headless Playwright for JS-rendered ones.")
+    add_bullet(doc, "Implemented profile matching and LLM text generation; reordering the prompt left 75% of it constant and cacheable as a prefix, with a regression test covering stack extraction.")
 
     # ── SKILLS ──
     add_section(doc, "Skills")
