@@ -5,44 +5,57 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
 [![GitHub repo](https://img.shields.io/github/stars/Mickaell22/ApplyJob?style=flat&logo=github)](https://github.com/Mickaell22/ApplyJob)
 
-Automatizacion de postulaciones laborales. Recibe links de ofertas, las analiza contra tu perfil, genera cartas personalizadas con IA y las postula automaticamente en sistemas ATS.
+Pipeline de agregacion y filtrado de ofertas de empleo. Descubre vacantes en 13 fuentes
+heterogeneas (APIs JSON, RSS, HTML server-rendered y SPAs con Playwright), las normaliza a
+un esquema comun, las filtra en cascada y las puntua contra tu perfil. Listar candidatas no
+gasta API; la carta se genera con un LLM solo para la oferta que elegis, despues de que vos
+revisaste el link.
 
 ---
 
 ## Pipeline
 
 ```
-      URL        +-----------+    +----------+    +---------+    +-----------+    +---------+
-ofertas --------->| Scraper  |--->| Matcher  |--->| Cover   |--->| Apply ATS |--->| Enviado |
-                  +-----------+    +----------+    +---------+    +-----------+    +---------+
-                        |               |               |              |
-                   extrae titulo,   compara vs      genera carta    llena formulario
-                   empresa, stack   perfil y CV     personalizada   y sube CV
-                                                        (DeepSeek)    (Playwright)
+   13 fuentes     +-----------+    +----------+    +----------+    +----------------+
+  -------------->| Discover  |--->| Filtros  |--->| Matcher  |--->| candidates.json|
+   APIs/RSS/HTML  +-----------+    +----------+    +----------+    +----------------+
+                        |               |              |                   |
+                   normaliza a      tecnicos,      puntua contra      vos revisas
+                   esquema comun    seniority,     tu stack             los links
+                                    geografia      (0 API)                  |
+                                                                            v
+                                                                     +-------------+
+                                                                     | gen_cover   |
+                                                                     |  1 carta    |
+                                                                     |  (DeepSeek) |
+                                                                     +-------------+
 ```
 
 ## Arquitectura
 
 ```
 ApplyJob/
-├── cli/main.py              # orquestador del pipeline
-├── cli/run_discover.py      # pipeline completo: descubre boards → filtra → genera cartas
-├── cli/run_batch.py         # batch: scrapea y genera cartas desde URLs
+├── cli/run_discover.py      # descubre boards → filtra → puntua → lista candidatas (0 API)
+├── cli/gen_cover.py         # genera UNA carta on-demand para la oferta elegida
+├── cli/main.py              # orquestador del pipeline clasico (una o varias URLs)
+├── cli/run_batch.py         # batch: scrapea y lista desde URLs
 ├── cli/run_manual.py        # batch: usa descripciones manuales (cuando scraping falla)
 ├── cli/run_today.py         # genera cartas para la shortlist del dia
 ├── profile/
-│   ├── cv.md            # perfil del candidato en español
-│   ├── cv_en.md         # perfil del candidato en ingles
-│   ├── cv.pdf           # CV en PDF (español)      ← CV_PATH en .env
+│   ├── cv.md            # perfil del candidato (lo leen matcher, cover y evaluator)
+│   ├── cv_es.pdf        # CV en PDF (español)      ← CV_PATH en .env
 │   ├── cv_en.pdf        # CV en PDF (ingles)        ← CV_PATH_EN en .env
+│   ├── generate_cv.py   # genera los .docx del CV (fuente; los PDF son derivados)
 │   └── cv_template.md   # plantilla de perfil para nuevos usuarios
 ├── src/
-│   ├── boards.py        # descubre ofertas desde 8+ tableros remotos
+│   ├── boards/          # 13 fuentes de ofertas (paquete: _common, remote_global,
+│   │                    #   linkedin, local, apply_urls)
 │   ├── scraper.py       # extrae informacion de ofertas desde URLs
-│   ├── profile.py       # carga y parsea el CV/perfil
 │   ├── matcher.py       # calcula compatibilidad oferta vs perfil
+│   ├── evaluator.py     # evaluacion on-demand: reglas duras 0 API + puntaje LLM
+│   ├── applied.py       # tracking de URLs ya vistas / ya postuladas
 │   ├── cover.py         # genera carta via DeepSeek (es/en); datos 100% desde .env
-│   ├── apply_ats.py     # auto-postulacion en ATS via Playwright
+│   ├── apply_ats.py     # relleno asistido de formularios ATS (opt-in, ver abajo)
 │   ├── letter_to_pdf.py # convierte cartas .txt a PDF via python-docx + LibreOffice
 │   ├── inbox.py         # lector IMAP para boletines
 │   └── sender.py        # envia correo via Gmail SMTP
@@ -91,12 +104,13 @@ cp profile/cv_template.md profile/cv.md
 # Edita profile/cv.md con tu experiencia, stack y datos de contacto
 ```
 
-Si vas a postular a empresas en inglés, crea también `profile/cv_en.md` con la misma estructura en inglés.
+`profile/cv.md` es la única fuente de perfil: las cartas en inglés se generan desde ese
+mismo archivo con `lang="en"`.
 
 **3. Pon tus CVs en PDF:**
 
 ```
-profile/cv.pdf      ← CV en español (o tu idioma principal)
+profile/cv_es.pdf   ← CV en español (o tu idioma principal)
 profile/cv_en.pdf   ← CV en inglés (opcional, para ofertas EN)
 ```
 
@@ -115,7 +129,7 @@ GMAIL_USER=tu-correo@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 
 # CVs en PDF (español e inglés)
-CV_PATH=./profile/cv.pdf
+CV_PATH=./profile/cv_es.pdf
 CV_PATH_EN=./profile/cv_en.pdf
 
 # Datos del candidato — usados en cartas y formularios ATS
@@ -188,6 +202,7 @@ decide `Apply/Consider/Research/Skip`. Con `Skip` no se genera carta
 | Remote First Jobs | API JSON | `entry_level/middle/intern` |
 | Working Nomads | API JSON | Manual (título) |
 | LinkedIn | HTML (jobs-guest, sin login) | `f_E=1,2` (Internship+Entry) en endpoint |
+| LinkedIn (sesión) | Playwright + storage_state | `f_E=1,2`; requiere `scripts/setup_linkedin_session.py` |
 | Hacker News | API Algolia (Who is hiring) | Manual (título) |
 | LinkedIn LOCAL | HTML (jobs-guest, sin login) | `f_E=1,2`; busca en `CANDIDATE_COUNTRY`, acepta presencial/híbrido (`canal: local`) |
 | Computrabajo | HTML server-rendered | Manual (título + "3+ años"); `canal: local`, subdominio via `COMPUTRABAJO_DOMAIN` |
@@ -225,7 +240,12 @@ python src/letter_to_pdf.py output/cartas/07_Canonical_SWE_Python_Cloud.txt
 # genera output/cartas/07_Canonical_SWE_Python_Cloud.pdf
 ```
 
-### Auto-postulacion en ATS
+### Relleno asistido de formularios ATS (opt-in, experimental)
+
+> El flujo por defecto **no** postula por vos: `run_discover.py` lista candidatas, vos
+> revisas los links y postulas a mano. `src/apply_ats.py` es un modulo aparte que rellena
+> los campos repetitivos de un formulario (nombre, contacto, CV) para no retipearlos en
+> cada ATS. Se usa en `dry_run=True` mientras se prueba un handler nuevo.
 
 ```python
 from src.apply_ats import run
@@ -282,7 +302,7 @@ if match["fit"] in ("alta", "media"):
         to_email="hr@empresa.com",
         subject=f"Candidatura: {job['title']}",
         body=carta,
-        attachment="./profile/cv.pdf",
+        attachment="./profile/cv_es.pdf",
     )
 ```
 
@@ -299,11 +319,19 @@ El matcher usa este archivo para calcular la compatibilidad con cada oferta.
 
 ## Compatibilidad
 
-El sistema evalua cada oferta contra tu perfil y asigna un score:
+`matcher.score()` extrae las tecnologias de las secciones `Stack`/`Skills` de tu `cv.md` y
+las busca en el titulo + descripcion de la oferta, con limite de palabra (sin el, `java`
+matchea `javascript` y `ci` matchea `efficient`). El `fit` va por **cantidad** de
+coincidencias, no por porcentaje:
 
-- **Alta** (>40%): procede a generar carta y enviar
-- **Media** (20-40%): procede con precaucion
-- **Baja** (<20%): descartada automaticamente
+- **Alta** (>=6 coincidencias): claramente de tu stack
+- **Media** (>=2): senal suficiente para revisarla
+- **Baja** (<2): descartada
+
+El porcentaje se reporta pero es solo informativo: como el denominador es tu CV entero,
+ampliar tu stack bajaria el porcentaje de la misma oferta y descalibraria el umbral solo.
+
+Self-check: `.venv/bin/python3 tests/test_matcher.py`
 
 ## Licencia
 
