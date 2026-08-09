@@ -219,6 +219,10 @@ def build_es():
     add_role_line(doc, "Ingeniería en Software — 9no semestre (de 10)", "2021 – presente")
     add_body(doc, "Promedio académico: 9.01 / 10  (escala 0–10, aprobación desde 7)")
 
+    add_org_line(doc, "Universidad de Guayaquil — FCMF", "Guayaquil, Ecuador", space_before=4)
+    add_role_line(doc, "Tech Lab: Servidor Web Local con GNU/Linux (40 horas)", "Ago. 2026")
+    add_body(doc, "Ubuntu Server sobre VM, SSH, UFW, permisos y stack LAMP (Apache, PHP, MariaDB)")
+
     add_org_line(doc, "Google / Coursera", "En línea", space_before=4)
     add_role_line(doc, "Certificado Profesional de Ciberseguridad", "2026 – en progreso")
 
@@ -318,6 +322,10 @@ def build_en():
     add_org_line(doc, "University of Guayaquil", "Guayaquil, Ecuador", space_before=4)
     add_role_line(doc, "B.Sc. Software Engineering — 9th semester (of 10)", "2021 – present")
     add_body(doc, "GPA: 9.01 / 10  (grading system: 0–10, minimum passing grade: 7)")
+
+    add_org_line(doc, "University of Guayaquil — FCMF", "Guayaquil, Ecuador", space_before=4)
+    add_role_line(doc, "Tech Lab: Local Web Server with GNU/Linux (40 hours)", "Aug. 2026")
+    add_body(doc, "Ubuntu Server on a VM, SSH, UFW, permissions and LAMP stack (Apache, PHP, MariaDB)")
 
     add_org_line(doc, "Google / Coursera", "Online", space_before=4)
     add_role_line(doc, "Professional Certificate in Cybersecurity", "2026 – in progress")
