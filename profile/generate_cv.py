@@ -119,6 +119,8 @@ def add_section(doc, title):
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _add_bottom_border(p)
     _set_spacing(p, before=8, after=2)
+    # Que el titulo no quede huerfano al pie de pagina, separado de su contenido.
+    p.paragraph_format.keep_with_next = True
     _base_run(p, title.upper(), bold=True, size=11)
 
 
@@ -127,6 +129,7 @@ def add_org_line(doc, org, location, space_before=4):
     p = doc.add_paragraph()
     _add_right_tab(p)
     _set_spacing(p, before=space_before, after=0)
+    p.paragraph_format.keep_with_next = True
     _base_run(p, org, bold=True)
     _base_run(p, "\t")
     _base_run(p, location)
@@ -137,6 +140,7 @@ def add_role_line(doc, role, date):
     p = doc.add_paragraph()
     _add_right_tab(p)
     _set_spacing(p, before=0, after=0)
+    p.paragraph_format.keep_with_next = True
     _base_run(p, role, italic=True)
     _base_run(p, "\t")
     _base_run(p, date)
@@ -184,7 +188,8 @@ def build_es():
         "Desarrollador fullstack con sistemas en producción para clientes reales en Ecuador "
         "(gestión clínica, facturación, inventario multisucursal). "
         "Especializado en Django/DRF y React/Next.js, con pruebas automatizadas y CI/CD, "
-        "y formación complementaria en ciberseguridad.",
+        "y formación complementaria en ciberseguridad. Actualmente pasante en el ERP corporativo "
+        "de Grupo Lucky con .NET, Angular y SQL Server.",
     )
 
     # ── EXPERIENCIA ──
@@ -192,7 +197,13 @@ def build_es():
     # producción pesan más que la etiqueta de "9no semestre".
     add_section(doc, "Experiencia")
 
-    add_org_line(doc, "Facilito", "Guayaquil, Ecuador")
+    add_org_line(doc, "Grupo Lucky", "Guayaquil, Ecuador")
+    add_role_line(doc, "Pasante de Desarrollo de Software", "Ago. 2026 – presente")
+    add_bullet(doc, "Construí de cero el calculador de décimos tercero y cuarto del ERP corporativo: stored procedures en SQL Server, API .NET en 4 capas con Dapper y pantalla Angular, con el CSV oficial del Ministerio del Trabajo y cierre de período.")
+    add_bullet(doc, "Llevé un reporte de asistencia que no terminaba de cargar a búsquedas O(1) por diccionario, y una bitácora de compras de demo a producción (PHP + MySQL, extracción de PDF con pdf.js).")
+    add_bullet(doc, "Resolví 17 incidencias de producción en módulos de RRHH, compras y finanzas, verificando cada fix contra la base real.")
+
+    add_org_line(doc, "Facilito", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Co-fundador & Desarrollador Fullstack", "Feb. 2026 – presente")
     add_bullet(doc, "Desarrollé backend con Django 5 + DRF + PostgreSQL para plataforma SaaS multitenancy del sector gastronómico.")
     add_bullet(doc, "Integré asistente IA con Claude (Anthropic) para consultas de inventario, gestión de pedidos y reportes automáticos.")
@@ -259,10 +270,10 @@ def build_es():
     # ── HABILIDADES ──
     add_section(doc, "Habilidades")
 
-    add_skills_line(doc, "Backend", "Python, Django/DRF, FastAPI, Flask, Node.js, Express, NestJS, C#, Java, PHP")
-    add_skills_line(doc, "Frontend", "React, Next.js, TypeScript, Tailwind CSS, Vite, Material UI, Zustand, Redux Toolkit")
+    add_skills_line(doc, "Backend", "Python, Django/DRF, FastAPI, Flask, Node.js, Express, NestJS, .NET, C#, Dapper, Java, PHP")
+    add_skills_line(doc, "Frontend", "React, Next.js, Angular, TypeScript, Tailwind CSS, Vite, Material UI, Zustand, Redux Toolkit")
     add_skills_line(doc, "Móvil", "Flutter, Dart, Riverpod, React Native, Expo, Kotlin")
-    add_skills_line(doc, "Bases de datos", "PostgreSQL, SQLAlchemy/Alembic, TypeORM, Prisma, Sequelize, Firebase, SQLite")
+    add_skills_line(doc, "Bases de datos", "PostgreSQL, SQL Server, MySQL, SQLAlchemy/Alembic, TypeORM, Prisma, Sequelize, Firebase, SQLite")
     add_skills_line(doc, "Testing", "pytest, Jest, Vitest, Testing Library, Supertest, JUnit + Mockito")
     add_skills_line(doc, "DevOps", "Git, Docker (multi-stage), CI/CD con GitHub Actions, Linux, VPS (Railway), nginx")
     add_skills_line(doc, "Ciberseguridad", "Kali Linux, Nmap, Wireshark, fundamentos de ethical hacking")
@@ -290,13 +301,20 @@ def build_en():
         "Fullstack developer with systems running in production for real clients in Ecuador "
         "(clinical management, order platform, multi-branch inventory). "
         "Focused on Django/DRF and React/Next.js, with automated testing and CI/CD, "
-        "and complementary training in cybersecurity.",
+        "and complementary training in cybersecurity. Currently interning on Grupo Lucky's "
+        "corporate ERP with .NET, Angular and SQL Server.",
     )
 
     # ── EXPERIENCE ──
     add_section(doc, "Experience")
 
-    add_org_line(doc, "Facilito", "Guayaquil, Ecuador")
+    add_org_line(doc, "Grupo Lucky", "Guayaquil, Ecuador")
+    add_role_line(doc, "Software Development Intern", "Aug 2026 – present")
+    add_bullet(doc, "Built the corporate ERP's 13th and 14th month bonus calculator from scratch: SQL Server stored procedures, a 4-layer .NET API with Dapper and an Angular screen, including the official Ministry of Labor CSV and period closing.")
+    add_bullet(doc, "Turned an attendance report that never finished loading into O(1) dictionary lookups, and took a purchasing log from demo to production (PHP + MySQL, PDF extraction with pdf.js).")
+    add_bullet(doc, "Resolved 17 production incidents across HR, purchasing and finance modules, verifying every fix against the real database.")
+
+    add_org_line(doc, "Facilito", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Co-founder & Fullstack Developer", "Feb 2026 – present")
     add_bullet(doc, "Built backend with Django 5 + Django REST Framework + PostgreSQL for a multitenancy SaaS targeting the restaurant industry.")
     add_bullet(doc, "Integrated an AI assistant powered by Claude (Anthropic) for inventory queries, order management, and automated reports.")
@@ -363,10 +381,10 @@ def build_en():
     # ── SKILLS ──
     add_section(doc, "Skills")
 
-    add_skills_line(doc, "Backend", "Python, Django/DRF, FastAPI, Flask, Node.js, Express, NestJS, C#, Java, PHP")
-    add_skills_line(doc, "Frontend", "React, Next.js, TypeScript, Tailwind CSS, Vite, Material UI, Zustand, Redux Toolkit")
+    add_skills_line(doc, "Backend", "Python, Django/DRF, FastAPI, Flask, Node.js, Express, NestJS, .NET, C#, Dapper, Java, PHP")
+    add_skills_line(doc, "Frontend", "React, Next.js, Angular, TypeScript, Tailwind CSS, Vite, Material UI, Zustand, Redux Toolkit")
     add_skills_line(doc, "Mobile", "Flutter, Dart, Riverpod, React Native, Expo, Kotlin")
-    add_skills_line(doc, "Databases", "PostgreSQL, SQLAlchemy/Alembic, TypeORM, Prisma, Sequelize, Firebase, SQLite")
+    add_skills_line(doc, "Databases", "PostgreSQL, SQL Server, MySQL, SQLAlchemy/Alembic, TypeORM, Prisma, Sequelize, Firebase, SQLite")
     add_skills_line(doc, "Testing", "pytest, Jest, Vitest, Testing Library, Supertest, JUnit + Mockito")
     add_skills_line(doc, "DevOps", "Git, Docker (multi-stage), CI/CD with GitHub Actions, Linux, VPS (Railway), nginx")
     add_skills_line(doc, "Cybersecurity", "Kali Linux, Nmap, Wireshark, ethical hacking fundamentals")
