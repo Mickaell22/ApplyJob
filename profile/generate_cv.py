@@ -201,7 +201,7 @@ def build_es():
     add_role_line(doc, "Pasante de Desarrollo de Software", "Ago. 2026 – presente")
     add_bullet(doc, "Construí de cero el calculador de décimos tercero y cuarto del ERP corporativo: stored procedures en SQL Server, API .NET en 4 capas con Dapper y pantalla Angular, con el CSV oficial del Ministerio del Trabajo y cierre de período.")
     add_bullet(doc, "Llevé un reporte de asistencia que no terminaba de cargar a búsquedas O(1) por diccionario, y una bitácora de compras de demo a producción (PHP + MySQL, extracción de PDF con pdf.js).")
-    add_bullet(doc, "Resolví 17 incidencias de producción en módulos de RRHH, compras y finanzas, verificando cada fix contra la base real.")
+    add_bullet(doc, "Resolví 18 incidencias de producción en módulos de RRHH, compras y finanzas, verificando cada fix contra la base real.")
 
     add_org_line(doc, "Facilito", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Co-fundador & Desarrollador Fullstack", "Feb. 2026 – presente")
@@ -312,7 +312,7 @@ def build_en():
     add_role_line(doc, "Software Development Intern", "Aug 2026 – present")
     add_bullet(doc, "Built the corporate ERP's 13th and 14th month bonus calculator from scratch: SQL Server stored procedures, a 4-layer .NET API with Dapper and an Angular screen, including the official Ministry of Labor CSV and period closing.")
     add_bullet(doc, "Turned an attendance report that never finished loading into O(1) dictionary lookups, and took a purchasing log from demo to production (PHP + MySQL, PDF extraction with pdf.js).")
-    add_bullet(doc, "Resolved 17 production incidents across HR, purchasing and finance modules, verifying every fix against the real database.")
+    add_bullet(doc, "Resolved 18 production incidents across HR, purchasing and finance modules, verifying every fix against the real database.")
 
     add_org_line(doc, "Facilito", "Guayaquil, Ecuador", space_before=6)
     add_role_line(doc, "Co-founder & Fullstack Developer", "Feb 2026 – present")
